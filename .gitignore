@@ -1,0 +1,26 @@
+# Firebase
+serviceAccountKey.json
+*.firebase.*.log
+
+# Dependencies
+/node_modules
+
+# Next.js
+/.next/
+/out/
+/build
+
+# Local Environment Variables
+.env
+.env*.local
+.env.development
+.env.production
+
+# VSCode
+.vscode/
+
+# Other
+.DS_Store
+*.pem
+
+.vercel

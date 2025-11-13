@@ -1,0 +1,100 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "type": "object",
+      "description": "Represents a user's profile information.",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The unique ID of the user."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "photoURL": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the user's profile picture."
+        },
+        "persalNumber": {
+            "type": "string",
+            "description": "The user's personnel number."
+        },
+        "district": {
+            "type": "string",
+            "description": "The sub-district the user belongs to."
+        },
+        "role": {
+            "type": "string",
+            "description": "The user's role in the system.",
+            "enum": ["Super Administrator", "Administrator", "Health Promoter"]
+        }
+      },
+      "required": ["uid", "email"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "type": "object",
+      "description": "Represents a generic activity logged by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the activity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who created the activity."
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the activity.",
+          "format": "date-time"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of activity (e.g., 'Weekly Plan', 'Health Talk')."
+        },
+        "details": {
+          "type": "object",
+          "description": "Specific details of the activity."
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the activity was created."
+        }
+      },
+      "required": ["id", "userId", "date", "type", "details", "createdAt"]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "google.com"
+    ]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores user profile information."
+    },
+    "/activities/{activityId}": {
+      "schema": {
+        "$ref": "#/entities/Activity"
+      },
+      "description": "Stores all user activities."
+    }
+  }
+}
+
+    
