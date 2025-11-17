@@ -177,7 +177,8 @@ export function RecentAttachments() {
                         </AlertDialog>
                     </div>
                 </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="flex flex-col h-60 items-center justify-center rounded-md border border-dashed text-center">
