@@ -24,24 +24,32 @@ export async function uploadFile(
   try {
     await new Promise<void>((resolve, reject) => {
       const task = uploadBytesResumable(storageRef, file);
-      
+
       let lastProgress = 0;
+      // timeout if upload stalls for too long (2 minutes)
+      const UPLOAD_TIMEOUT_MS = 2 * 60 * 1000;
+      const timeoutId = setTimeout(() => {
+        console.error(`[uploadFile] Upload timed out for ${file.name} after ${UPLOAD_TIMEOUT_MS}ms`);
+        try { task.cancel(); } catch (e) { /* ignore */ }
+        reject(new Error("Upload timed out"));
+      }, UPLOAD_TIMEOUT_MS);
+
       task.on(
         "state_changed",
         (snapshot) => {
-          const progress = Math.round(
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-          );
+          const progress = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
           console.log(`[uploadFile] Progress for ${file.name}: ${progress}% (${snapshot.bytesTransferred}/${snapshot.totalBytes} bytes)`);
           lastProgress = progress;
           onProgress(progress);
         },
         (err) => {
+          clearTimeout(timeoutId);
           console.error(`[uploadFile] Upload failed for ${file.name}:`, err);
           console.error(`[uploadFile] Last known progress: ${lastProgress}%`);
           reject(err);
         },
         () => {
+          clearTimeout(timeoutId);
           console.log(`[uploadFile] Upload completed for ${file.name}`);
           resolve();
         }
