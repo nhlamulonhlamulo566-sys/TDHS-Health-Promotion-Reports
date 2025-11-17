@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   doc,
   addDoc,
+  setDoc,
   deleteDoc,
   collection,
   serverTimestamp,
@@ -106,9 +107,9 @@ const useStore = create<StoreState>((set, get) => ({
         uploadError: null,
       };
 
-      console.log("[addAttachment] Creating Firestore document...");
-      docRef = await addDoc(collection(db, "attachments"), newAttachment);
-      console.log("[addAttachment] Firestore document created:", docRef.id);
+      // Create a document reference (not written yet) so we have an id to upload files under
+      docRef = doc(collection(db, "attachments"));
+      console.log("[addAttachment] Prepared Firestore document reference (not written yet):", docRef.id);
 
       const updateProgress = (fileName: string, progress: number) => {
         console.log(`[addAttachment] Progress update for ${fileName}: ${progress}%`);
@@ -159,17 +160,18 @@ const useStore = create<StoreState>((set, get) => ({
       await Promise.all(uploadPromises);
       console.log("[addAttachment] All uploads completed successfully");
 
-      // 5. Update Firestore with all URLs at once if there are any, and mark uploadStatus
-      if (Object.keys(updatePayload).length > 0) {
-        console.log("[addAttachment] Updating Firestore with URLs:", updatePayload);
-        // ensure we also set uploadStatus to complete
-        updatePayload.uploadStatus = 'complete';
-        await updateDoc(docRef, updatePayload as any);
-        console.log("[addAttachment] Firestore document updated with URLs and status=complete");
-      } else {
-        console.warn("[addAttachment] No URLs to update in Firestore — marking upload as failed");
-        await updateDoc(docRef, { uploadStatus: 'failed', uploadError: 'No files were uploaded' } as any);
-      }
+      // 5. Create the Firestore document now that uploads succeeded
+      const finalAttachment: Omit<AttachmentDoc, 'id'> = {
+        ...newAttachment,
+        registerAttachmentUrl: updatePayload.registerAttachmentUrl || null,
+        pictureAttachmentUrls: updatePayload.pictureAttachmentUrls || [],
+        uploadStatus: Object.keys(updatePayload).length > 0 ? 'complete' : 'failed',
+        uploadError: Object.keys(updatePayload).length > 0 ? undefined : 'No files were uploaded',
+      };
+
+      console.log('[addAttachment] Writing Firestore document with uploaded URLs', finalAttachment);
+      await setDoc(docRef, finalAttachment as any);
+      console.log('[addAttachment] Firestore document written:', docRef.id);
 
       // Reset state after a brief delay to allow UI to show 100% progress
       setTimeout(() => {
