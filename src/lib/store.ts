@@ -87,6 +87,7 @@ const useStore = create<StoreState>((set, get) => ({
     if (!userId) throw new Error("User not authenticated.");
     if (!app) throw new Error("Firebase app not provided.");
 
+    console.log("[addAttachment] Starting attachment upload process", { userId, district, uploadTasks });
     set({ isUploading: true, uploadProgress: {} });
     let docRef: DocumentReference | null = null;
 
@@ -103,9 +104,12 @@ const useStore = create<StoreState>((set, get) => ({
         pictureAttachmentUrls: [],
       };
 
+      console.log("[addAttachment] Creating Firestore document...");
       docRef = await addDoc(collection(db, "attachments"), newAttachment);
+      console.log("[addAttachment] Firestore document created:", docRef.id);
 
       const updateProgress = (fileName: string, progress: number) => {
+        console.log(`[addAttachment] Progress update for ${fileName}: ${progress}%`);
         set((state) => ({
           uploadProgress: { ...state.uploadProgress, [fileName]: progress },
         }));
@@ -116,7 +120,9 @@ const useStore = create<StoreState>((set, get) => ({
       
       const uploadAndTrack = async (file: File, key: 'registerAttachmentUrl' | 'pictureAttachmentUrls') => {
         try {
+          console.log(`[addAttachment] Uploading file: ${file.name} to key: ${key}`);
           const url = await uploadFile(app, file, docRef!.id, (p) => updateProgress(file.name, p));
+          console.log(`[addAttachment] File uploaded successfully: ${file.name} -> ${url}`);
           if (key === 'registerAttachmentUrl') {
             updatePayload.registerAttachmentUrl = url;
           } else {
@@ -126,7 +132,7 @@ const useStore = create<StoreState>((set, get) => ({
             updatePayload.pictureAttachmentUrls.push(url);
           }
         } catch (uploadError) {
-          console.error(`Failed to upload ${file.name}.`, uploadError);
+          console.error(`[addAttachment] Failed to upload ${file.name}:`, uploadError);
           // We throw here to make sure the Promise.all fails
           throw uploadError;
         }
@@ -134,32 +140,43 @@ const useStore = create<StoreState>((set, get) => ({
       
       // 2. Handle Register File
       if (uploadTasks?.registerFile) {
+        console.log("[addAttachment] Queuing register file for upload");
         uploadPromises.push(uploadAndTrack(uploadTasks.registerFile, 'registerAttachmentUrl'));
       }
 
       // 3. Handle Picture Files
       if (uploadTasks?.pictureFiles && uploadTasks.pictureFiles.length > 0) {
+        console.log(`[addAttachment] Queuing ${uploadTasks.pictureFiles.length} picture files for upload`);
         uploadTasks.pictureFiles.forEach(file => {
           uploadPromises.push(uploadAndTrack(file, 'pictureAttachmentUrls'));
         });
       }
       
       // 4. Wait for all uploads to settle
+      console.log(`[addAttachment] Waiting for ${uploadPromises.length} uploads to complete...`);
       await Promise.all(uploadPromises);
+      console.log("[addAttachment] All uploads completed successfully");
 
       // 5. Update Firestore with all URLs at once if there are any
       if (Object.keys(updatePayload).length > 0) {
+        console.log("[addAttachment] Updating Firestore with URLs:", updatePayload);
         await updateDoc(docRef, updatePayload);
+        console.log("[addAttachment] Firestore document updated with URLs");
+      } else {
+        console.warn("[addAttachment] No URLs to update in Firestore");
       }
       
       // Reset state after a brief delay to allow UI to show 100% progress
       setTimeout(() => {
+        console.log("[addAttachment] Resetting upload state");
         set({ isUploading: false, uploadProgress: {} });
       }, 500);
       
+      console.log("[addAttachment] Upload process completed successfully");
       return docRef.id;
 
     } catch (error: any) {
+        console.error("[addAttachment] Upload process failed:", error);
         const isCreateOp = !docRef;
         // If an error occurs, especially during uploads, we need to inform the user.
         // The FirestorePermissionError is a good way to wrap this.
