@@ -102,6 +102,8 @@ const useStore = create<StoreState>((set, get) => ({
         createdAt: serverTimestamp(),
         registerAttachmentUrl: null,
         pictureAttachmentUrls: [],
+        uploadStatus: 'pending',
+        uploadError: null,
       };
 
       console.log("[addAttachment] Creating Firestore document...");
@@ -157,21 +159,24 @@ const useStore = create<StoreState>((set, get) => ({
       await Promise.all(uploadPromises);
       console.log("[addAttachment] All uploads completed successfully");
 
-      // 5. Update Firestore with all URLs at once if there are any
+      // 5. Update Firestore with all URLs at once if there are any, and mark uploadStatus
       if (Object.keys(updatePayload).length > 0) {
         console.log("[addAttachment] Updating Firestore with URLs:", updatePayload);
-        await updateDoc(docRef, updatePayload);
-        console.log("[addAttachment] Firestore document updated with URLs");
+        // ensure we also set uploadStatus to complete
+        updatePayload.uploadStatus = 'complete';
+        await updateDoc(docRef, updatePayload as any);
+        console.log("[addAttachment] Firestore document updated with URLs and status=complete");
       } else {
-        console.warn("[addAttachment] No URLs to update in Firestore");
+        console.warn("[addAttachment] No URLs to update in Firestore — marking upload as failed");
+        await updateDoc(docRef, { uploadStatus: 'failed', uploadError: 'No files were uploaded' } as any);
       }
-      
+
       // Reset state after a brief delay to allow UI to show 100% progress
       setTimeout(() => {
         console.log("[addAttachment] Resetting upload state");
         set({ isUploading: false, uploadProgress: {} });
       }, 500);
-      
+
       console.log("[addAttachment] Upload process completed successfully");
       return docRef.id;
 
@@ -188,6 +193,14 @@ const useStore = create<StoreState>((set, get) => ({
             },
             error
         );
+        // If we created a doc, mark it as failed and store the error to help debugging
+        if (docRef) {
+          try {
+            await updateDoc(docRef, { uploadStatus: 'failed', uploadError: String(error?.message || error) } as any);
+          } catch (e) {
+            console.error('[addAttachment] Failed to write failure status to Firestore doc:', e);
+          }
+        }
         // Reset state immediately on error
         set({ isUploading: false, uploadProgress: {} });
         // We throw the error so the form's own catch block can handle it.

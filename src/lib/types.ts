@@ -20,6 +20,9 @@ export interface AttachmentDoc {
   registerAttachmentUrl?: string | null;
   pictureAttachmentUrls?: string[];
   createdAt?: any;
+  // uploadStatus: 'pending' | 'complete' | 'failed' - helps UI reflect upload progress persisted in Firestore
+  uploadStatus?: string;
+  uploadError?: string;
 }
 
 export interface UploadTasks {

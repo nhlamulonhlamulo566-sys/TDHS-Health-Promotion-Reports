@@ -61,13 +61,25 @@ export function RecentAttachments() {
             </div>
         ) : sortedAttachments.length > 0 ? (
           <div className="space-y-4">
-            {sortedAttachments.map((attachment) => (
-                <div key={attachment.id} className="flex items-start justify-between gap-4 rounded-lg p-4 hover:bg-secondary">
+            {sortedAttachments.map((attachment) => {
+              const isUploadingAttachment = attachment.uploadStatus === 'pending';
+              const isFailedAttachment = attachment.uploadStatus === 'failed';
+              return (
+              <div key={attachment.id} className="flex items-start justify-between gap-4 rounded-lg p-4 hover:bg-secondary">
                     <div className="grid gap-2 flex-1">
                       <p className="font-semibold">{attachment.title}</p>
                       
                       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                        {attachment.registerAttachmentUrl && (
+                        {isUploadingAttachment && (
+                          <div className="text-xs text-foreground font-medium flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Uploading...</span>
+                          </div>
+                        )}
+                        {isFailedAttachment && (
+                          <div className="text-xs text-destructive font-medium">Upload Failed</div>
+                        )}
+                        {attachment.registerAttachmentUrl && !isUploadingAttachment && !isFailedAttachment && (
                             <button
                               onClick={() => {
                                 const a = document.createElement('a');
@@ -93,8 +105,8 @@ export function RecentAttachments() {
                                     <ImageIcon className="size-3" />
                                     <span>{attachment.pictureAttachmentUrls.length} Picture{attachment.pictureAttachmentUrls.length > 1 ? 's' : ''}</span>
                                 </button>
-                                {expandedPictures[attachment.id] && (
-                                    <div className="mt-2 grid grid-cols-2 gap-2 p-2 bg-secondary rounded">
+                                {expandedPictures[attachment.id] && !isUploadingAttachment && !isFailedAttachment && (
+                                  <div className="mt-2 grid grid-cols-2 gap-2 p-2 bg-secondary rounded">
                                         {attachment.pictureAttachmentUrls.map((url, idx) => (
                                             <button
                                               key={idx}
