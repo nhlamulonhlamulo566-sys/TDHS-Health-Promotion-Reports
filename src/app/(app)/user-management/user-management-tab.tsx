@@ -78,11 +78,13 @@ import { useUsers } from "@/hooks/use-users";
 const addUserFormSchema = z.object({
   displayName: z.string().min(1, "Name is required."),
   email: z.string().email("Please enter a valid email address."),
+  organization: z.string().optional(),
+  phone: z.string().optional(),
   role: z.string().min(1, "Role is required."),
   password: z.string().min(8, "Password must be at least 8 characters."),
   confirmPassword: z.string(),
   persalNumber: z.string().length(8, { message: "Persal number must be exactly 8 characters." }).optional().or(z.literal('')),
-  district: z.string().optional(),
+  district: z.string().min(1, "District is required."),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match.",
   path: ["confirmPassword"],
@@ -108,6 +110,8 @@ function AddUserDialog({ onUserAdded, currentUserRole }) {
     defaultValues: {
       displayName: "",
       email: "",
+      organization: "",
+      phone: "",
       role: "Health Promoter",
       password: "",
       confirmPassword: "",
@@ -135,7 +139,7 @@ function AddUserDialog({ onUserAdded, currentUserRole }) {
         <DialogHeader>
           <DialogTitle>Add New User</DialogTitle>
           <DialogDescription>
-            Create a new user account and profile in the system.
+            Create a new user account and assign them a role. They will receive an email to set up their password.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -166,6 +170,34 @@ function AddUserDialog({ onUserAdded, currentUserRole }) {
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="organization"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Organization</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Organization Name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                        <Input placeholder="012 345 6789" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
             <FormField
               control={form.control}
               name="password"
@@ -211,7 +243,7 @@ function AddUserDialog({ onUserAdded, currentUserRole }) {
                 name="district"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>District</FormLabel>
+                    <FormLabel>District *</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                             <SelectTrigger>
@@ -236,7 +268,7 @@ function AddUserDialog({ onUserAdded, currentUserRole }) {
               name="role"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role</FormLabel>
+                  <FormLabel>Role *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -333,6 +365,8 @@ export function UserManagementTab() {
                 uid: newUser.uid,
                 displayName: data.displayName,
                 email: data.email,
+                organization: data.organization || "",
+                phone: data.phone || "",
                 role: data.role,
                 persalNumber: data.persalNumber || "",
                 district: data.district || "",

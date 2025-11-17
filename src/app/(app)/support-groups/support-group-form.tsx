@@ -46,9 +46,7 @@ import { TimePicker } from "@/components/ui/time-picker";
 import React from "react";
 import useStore from "@/lib/store";
 import { useFirebase, useUser } from "@/firebase";
-import { FileUpload } from "@/components/ui/file-upload";
 import { useUsers } from "@/hooks/use-users";
-import { prepareActivityData } from "@/lib/activity-utils";
 
 const supportGroupFormSchema = z.object({
   date: z.date({
@@ -65,8 +63,6 @@ const supportGroupFormSchema = z.object({
   endTime: z.string().min(1, "End time is required"),
   peopleReached: z.coerce.number().min(1, "Please enter a number."),
   notes: z.string().optional(),
-  registerFile: z.any().optional(),
-  pictureFile: z.any().optional(),
 }).refine(data => {
     if (data.topic === 'Other' && (!data.otherTopic || data.otherTopic.trim() === '')) {
         return false;
@@ -117,8 +113,6 @@ const defaultValues: Partial<SupportGroupFormValues> = {
   notes: "",
   startTime: "",
   endTime: "",
-  registerFile: null,
-  pictureFile: null,
 };
 
 const groupTypes = [
@@ -155,7 +149,6 @@ export function SupportGroupForm() {
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
-  const [fileUploadKey, setFileUploadKey] = React.useState(Date.now());
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   
   const form = useForm<SupportGroupFormValues>({
@@ -222,8 +215,12 @@ export function SupportGroupForm() {
     
     setIsSubmitting(true);
     try {
-        const { activityData, uploadTasks } = await prepareActivityData(data, 'Support Group');
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData, uploadTasks);
+        const activityData = {
+          date: data.date.toISOString(),
+          type: 'Support Group',
+          details: data,
+        };
+        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
         
         toast({
         title: "Support Group Session Saved!",
@@ -231,7 +228,6 @@ export function SupportGroupForm() {
         });
         form.reset(defaultValues);
         setDuration(null);
-        setFileUploadKey(Date.now());
     } catch (error: any) {
         console.error("Failed to save support group session:", error);
         toast({
@@ -524,48 +520,6 @@ export function SupportGroupForm() {
                 </FormItem>
               )}
             />
-            <div className="space-y-2">
-                <FormLabel>Attachments</FormLabel>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                    control={form.control}
-                    name="registerFile"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormControl>
-                            <FileUpload
-                              key={fileUploadKey}
-                              onFileSelect={(file) => field.onChange(file)}
-                              title="Click to upload register"
-                              subtitle="PDF, DOC, or images"
-                              icon="file"
-                            />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={form.control}
-                    name="pictureFile"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormControl>
-                            <FileUpload
-                              key={fileUploadKey}
-                              onFileSelect={(file) => field.onChange(file)}
-                              title="Click to upload pictures"
-                              subtitle="PNG, JPG, GIF"
-                              accept="image/*"
-                              icon="image"
-                            />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                </div>
-            </div>
 
             <FormField
               control={form.control}
@@ -596,7 +550,6 @@ export function SupportGroupForm() {
                 onClick={() => {
                   form.reset(defaultValues);
                   setDuration(null);
-                  setFileUploadKey(Date.now());
                 }}
               >
                 Cancel
@@ -608,3 +561,5 @@ export function SupportGroupForm() {
     </Card>
   );
 }
+
+    

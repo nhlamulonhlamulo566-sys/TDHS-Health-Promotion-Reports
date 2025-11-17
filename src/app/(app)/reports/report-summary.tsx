@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download, Activity, Users, TrendingUp, Clock } from "lucide-react";
 import { format } from "date-fns";
-import { UserProfile } from "@/lib/store";
+import { UserProfile, Attachment } from "@/lib/store";
 
 interface ReportSummaryProps {
   data: {
@@ -22,6 +22,7 @@ interface ReportSummaryProps {
     },
     breakdown: { [key: string]: number },
     activities: any[], // Full activities data
+    attachments: Attachment[], // Full attachments data
     config: {
         reportType: string;
         date: { from: Date, to: Date };
@@ -56,13 +57,8 @@ const activityLabels = {
     tish: 'TISH',
     cornerToCorner: 'Corner to Corner',
     supportGroups: 'Support Group',
+    attachments: 'Attachment',
 };
-
-// A reverse mapping from label to key
-const activityKeys = Object.fromEntries(
-  Object.entries(activityLabels).map(([key, value]) => [value, key])
-);
-
 
 const escapeCsvCell = (cellData: any) => {
     if (cellData === null || cellData === undefined) {
@@ -76,13 +72,15 @@ const escapeCsvCell = (cellData: any) => {
 };
 
 export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSummaryProps) {
-  const { summary, breakdown, config, activities, users } = data;
+  const { summary, breakdown, config, activities, attachments, users } = data;
     
   const handleDownload = () => {
-    const activityTypesToDownload = (selectedActivitiesForDownload.length > 0 
+    const activityKeysToDownload = (selectedActivitiesForDownload.length > 0 
         ? selectedActivitiesForDownload 
-        : Object.keys(breakdown)
-    ).map(key => activityLabels[key]);
+        : Object.keys(breakdown).filter(key => key !== 'attachments')
+    );
+    
+    const activityTypesToDownload = activityKeysToDownload.map(key => activityLabels[key]).filter(Boolean);
     
     const detailedActivities = activities.filter(activity => activityTypesToDownload.includes(activity.type));
 
@@ -105,16 +103,15 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
         "Mobilization Method",
         // Support Group specific
         "Support Group Type", "Physical Activity",
-        // Attachments
-        "Register Attachment URL", "Picture Attachment URL",
+        // Attachment specific (now separate)
     ];
 
-    const allKeys = new Set<string>();
-    detailedActivities.forEach(a => {
-        Object.keys(a.details).forEach(k => allKeys.add(k));
-    });
+    const attachmentHeaders = [
+        "Attachment ID", "User Name", "District", "Date", "Title", "Notes", 
+        "Register Attachment URL", "Picture Attachment URLs"
+    ]
 
-    const rows = detailedActivities.map(activity => {
+    const activityRows = detailedActivities.map(activity => {
         const user = users.find(u => u.id === activity.userId);
         const details = activity.details || {};
         const rowData = {
@@ -145,13 +142,29 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
             "Mobilization Method": details.mobilizationMethod === 'Other' ? details.otherMobilizationMethod : details.mobilizationMethod,
             "Support Group Type": details.supportGroupType === 'Other' ? details.otherSupportGroupType : details.supportGroupType,
             "Physical Activity": details.physicalActivity === 'Other' ? details.otherPhysicalActivity : details.physicalActivity,
-            "Register Attachment URL": details.registerAttachment?.startsWith('https://') ? details.registerAttachment : '',
-            "Picture Attachment URL": details.pictureAttachment?.startsWith('https://') ? details.pictureAttachment : '',
         };
         return headers.map(header => escapeCsvCell(rowData[header])).join(',');
     });
 
-    const csvContent = [headers.join(','), ...rows].join('\n');
+    let csvContent = [headers.join(','), ...activityRows].join('\n');
+
+    if (selectedActivitiesForDownload.includes('attachments')) {
+        const attachmentRows = attachments.map(attachment => {
+            const user = users.find(u => u.id === attachment.userId);
+            return [
+                escapeCsvCell(attachment.id),
+                escapeCsvCell(user?.displayName),
+                escapeCsvCell(attachment.district),
+                escapeCsvCell(format(new Date(attachment.date), 'yyyy-MM-dd')),
+                escapeCsvCell(attachment.title),
+                escapeCsvCell(attachment.notes),
+                escapeCsvCell(attachment.registerAttachmentUrl),
+                escapeCsvCell(Array.isArray(attachment.pictureAttachmentUrls) ? attachment.pictureAttachmentUrls.join(', ') : ''),
+            ].join(',');
+        });
+        csvContent += '\n\n' + [attachmentHeaders.join(','), ...attachmentRows].join('\n');
+    }
+
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

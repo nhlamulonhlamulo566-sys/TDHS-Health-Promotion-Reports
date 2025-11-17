@@ -46,9 +46,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import useStore from "@/lib/store";
 import { useFirebase, useUser } from "@/firebase";
 import { TimePicker } from "@/components/ui/time-picker";
-import { FileUpload } from "@/components/ui/file-upload";
 import { useUsers } from "@/hooks/use-users";
-import { prepareActivityData } from "@/lib/activity-utils";
 
 const topics = [
     "Health Education",
@@ -77,8 +75,6 @@ const campaignFormSchema = z.object({
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
-  registerFile: z.any().optional(),
-  pictureFile: z.any().optional(),
 }).refine(data => {
     if (data.campaignType === 'Other' && (!data.otherCampaignType || data.otherCampaignType.trim() === '')) {
         return false;
@@ -129,8 +125,6 @@ const defaultValues: Partial<CampaignFormValues> = {
   notes: "",
   startTime: "",
   endTime: "",
-  registerFile: null,
-  pictureFile: null,
 };
 
 const campaignTypes = [
@@ -156,7 +150,6 @@ export function SocialMobilizationForm() {
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
-  const [fileUploadKey, setFileUploadKey] = React.useState(Date.now());
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   
   const form = useForm<CampaignFormValues>({
@@ -215,8 +208,12 @@ export function SocialMobilizationForm() {
     
     setIsSubmitting(true);
     try {
-        const { activityData, uploadTasks } = await prepareActivityData(data, 'Social Mobilization');
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData, uploadTasks);
+        const activityData = {
+          date: data.date.toISOString(),
+          type: 'Social Mobilization',
+          details: data,
+        };
+        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
 
         toast({
         title: "Mobilization Campaign Saved!",
@@ -224,7 +221,6 @@ export function SocialMobilizationForm() {
         });
         form.reset(defaultValues);
         setDuration(null);
-        setFileUploadKey(Date.now());
     } catch (error: any) {
         console.error("Failed to save social mobilization:", error);
         toast({
@@ -518,49 +514,6 @@ export function SocialMobilizationForm() {
                 </FormItem>
               )}
             />
-            
-            <div className="space-y-2">
-                <FormLabel>Attachments</FormLabel>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                    control={form.control}
-                    name="registerFile"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormControl>
-                            <FileUpload
-                              key={fileUploadKey}
-                              onFileSelect={(file) => field.onChange(file)}
-                              title="Click to upload register"
-                              subtitle="PDF, DOC, or images"
-                              icon="file"
-                            />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={form.control}
-                    name="pictureFile"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormControl>
-                            <FileUpload
-                              key={fileUploadKey}
-                              onFileSelect={(file) => field.onChange(file)}
-                              title="Click to upload pictures"
-                              subtitle="PNG, JPG, GIF"
-                              accept="image/*"
-                              icon="image"
-                            />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                </div>
-            </div>
 
             <FormField
               control={form.control}

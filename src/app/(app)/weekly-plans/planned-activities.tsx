@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { format } from 'date-fns';
-import { MapPin, Trash2, Loader2, Clock, User, Building } from 'lucide-react';
+import { MapPin, Trash2, Loader2, Clock, User, Building, NotebookPen } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -79,6 +79,12 @@ export function PlannedActivities() {
                         <MapPin className="size-4" />
                         <span>{item.details.venue}</span>
                       </div>
+                      {item.details.nb && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <NotebookPen className="size-4" />
+                            <span>{item.details.nb}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="size-4" />
                         <span>{item.details.startTime} - {item.details.endTime}</span>

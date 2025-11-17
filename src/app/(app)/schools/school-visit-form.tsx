@@ -39,9 +39,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import useStore from "@/lib/store";
 import { useFirebase, useUser } from "@/firebase";
 import { TimePicker } from "@/components/ui/time-picker";
-import { FileUpload } from "@/components/ui/file-upload";
 import { useUsers } from "@/hooks/use-users";
-import { prepareActivityData } from "@/lib/activity-utils";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const topics = [
@@ -94,8 +92,6 @@ const schoolVisitFormSchema = z.object({
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
-  registerFile: z.any().optional(),
-  pictureFile: z.any().optional(),
 }).refine(data => {
     if (data.topic === 'Other' && (!data.otherTopic || data.otherTopic.trim() === '')) {
         return false;
@@ -126,8 +122,6 @@ const defaultValues: Partial<SchoolVisitFormValues> = {
   notes: "",
   startTime: "",
   endTime: "",
-  registerFile: null,
-  pictureFile: null,
 };
 
 export function SchoolVisitForm() {
@@ -137,7 +131,6 @@ export function SchoolVisitForm() {
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
-  const [fileUploadKey, setFileUploadKey] = React.useState(Date.now());
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   
   const form = useForm<SchoolVisitFormValues>({
@@ -190,8 +183,12 @@ export function SchoolVisitForm() {
 
     setIsSubmitting(true);
     try {
-        const { activityData, uploadTasks } = await prepareActivityData(data, 'School Visit');
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData, uploadTasks);
+        const activityData = {
+          date: data.date.toISOString(),
+          type: 'School Visit',
+          details: data,
+        };
+        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
 
         toast({
         title: "School Visit Saved!",
@@ -199,7 +196,6 @@ export function SchoolVisitForm() {
         });
         form.reset(defaultValues);
         setDuration(null);
-        setFileUploadKey(Date.now());
     } catch (error: any) {
         console.error("Failed to save school visit:", error);
         toast({
@@ -454,49 +450,6 @@ export function SchoolVisitForm() {
                 </FormItem>
               )}
             />
-            
-            <div className="space-y-2">
-              <FormLabel>Attachments</FormLabel>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="registerFile"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <FileUpload
-                          key={fileUploadKey}
-                          onFileSelect={(file) => field.onChange(file)}
-                          title="Click to upload register"
-                          subtitle="PDF, DOC, or images"
-                          icon="file"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="pictureFile"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <FileUpload
-                          key={fileUploadKey}
-                          onFileSelect={(file) => field.onChange(file)}
-                          title="Click to upload pictures"
-                          subtitle="PNG, JPG, GIF"
-                          accept="image/*"
-                          icon="image"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
 
             <FormField
               control={form.control}

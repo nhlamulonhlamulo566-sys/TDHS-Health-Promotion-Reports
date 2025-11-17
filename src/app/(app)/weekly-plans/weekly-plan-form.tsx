@@ -39,6 +39,7 @@ const weeklyPlanSchema = z.object({
   }),
   activity: z.string().min(1, "Activity description is required."),
   venue: z.string().min(1, "Venue is required."),
+  nb: z.string().min(1, "NB is required."),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
 }).refine(data => {
@@ -57,6 +58,7 @@ type WeeklyPlanFormValues = z.infer<typeof weeklyPlanSchema>;
 const defaultValues: Partial<WeeklyPlanFormValues> = {
   activity: "",
   venue: "",
+  nb: "",
   startTime: "",
   endTime: "",
   date: undefined,
@@ -276,6 +278,24 @@ export function WeeklyPlanForm() {
                                     {...field}
                                 />
                             </div>
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="nb"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>NB *</FormLabel>
+                        <FormControl>
+                            <Textarea
+                                placeholder="Add important notes about the venue or activity..."
+                                rows={2}
+                                {...field}
+                            />
                         </FormControl>
                         <FormMessage />
                         </FormItem>

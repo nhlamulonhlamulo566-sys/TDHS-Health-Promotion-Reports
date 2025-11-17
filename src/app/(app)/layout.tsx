@@ -13,6 +13,7 @@ import {
   LogOut,
   Megaphone,
   Mic,
+  Paperclip,
   School,
   Settings,
   Siren,
@@ -45,6 +46,8 @@ import { useUsers } from '@/hooks/use-users';
 import { UserProfile } from '@/lib/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import ChunkErrorBoundary from '../chunk-error-handler';
+import { useIdleTimeout } from '@/hooks/use-idle-timeout';
+import { useToast } from '@/hooks/use-toast';
 
 const menuItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -59,6 +62,7 @@ const menuItems = [
   { href: '/support-groups', label: 'Support Groups', icon: Users },
   { href: '/corner-to-corner', label: 'Corner to Corner', icon: Home },
   { href: '/tish', label: 'TISH', icon: Home },
+  { href: '/attachments', label: 'Attachments', icon: Paperclip },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/user-management', label: 'Settings', icon: Settings },
 ];
@@ -175,10 +179,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const firestore = useFirestore();
   const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = React.useState(true);
+  const { toast } = useToast();
   
   // Initialize data fetching hooks. They will manage their own loading state.
   useActivities();
   useUsers();
+  
+  const handleLogout = React.useCallback(async (isIdle = false) => {
+    if(auth) {
+        await signOut(auth);
+        if (isIdle) {
+            toast({
+                title: "You have been signed out",
+                description: "You were signed out due to inactivity.",
+            });
+        }
+    }
+    router.push('/login');
+  }, [auth, signOut, router, toast]);
+
+  // Auto-logout after 5 minutes of inactivity.
+  useIdleTimeout(() => handleLogout(true), 5 * 60 * 1000);
   
   React.useEffect(() => {
     if (!authLoading && !user) {
@@ -216,13 +237,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     fetchUserProfile();
   }, [user, firestore]);
 
-  const handleLogout = async () => {
-    if(auth) {
-        await signOut(auth);
-    }
-    router.push('/login');
-  };
-
   if (authLoading || profileLoading) {
      return (
       <div className="flex h-screen w-screen items-center justify-center">
@@ -239,7 +253,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <InnerLayout userProfile={userProfile} onLogout={handleLogout}>
+    <InnerLayout userProfile={userProfile} onLogout={() => handleLogout(false)}>
       {children}
     </InnerLayout>
   );

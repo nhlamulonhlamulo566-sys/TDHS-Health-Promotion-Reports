@@ -2,7 +2,7 @@
 'use client';
 import type { FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, type Firestore } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeFirebase } from '.';
 import { FirebaseProvider, type FirebaseContextType } from './provider';
@@ -31,21 +31,17 @@ export function FirebaseClientProvider({ children }: React.PropsWithChildren) {
   useEffect(() => {
     const { app } = initializeFirebase();
     const auth = getAuth(app);
-    const firestore = getFirestore(app);
-
-    enableIndexedDbPersistence(firestore)
-      .then(() => {
-         console.log("Firestore offline persistence enabled");
-         setFirebaseState({ app, auth, firestore, loading: false });
-      })
-      .catch((err) => {
-        if (err.code == 'failed-precondition') {
-            console.warn("Firestore offline persistence could not be enabled: Multiple tabs open.");
-        } else if (err.code == 'unimplemented') {
-            console.warn("Firestore offline persistence could not be enabled: Browser does not support it.");
-        }
-        setFirebaseState({ app, auth, firestore, loading: false });
+    
+    // Use the modern initializeFirestore with localCache setting
+    const firestore = initializeFirestore(app, {
+      localCache: persistentLocalCache({})
     });
+
+    // Since initialization is now synchronous for the most part,
+    // we can set the state directly. The persistence itself will work in the background.
+    console.log("Firestore with offline persistence configured.");
+    setFirebaseState({ app, auth, firestore, loading: false });
+
   }, []);
 
   if (firebaseState.loading) {

@@ -9,6 +9,7 @@ import { ActivityBreakdown } from "./activity-breakdown";
 import { Separator } from "@/components/ui/separator";
 import { useActivities } from "@/hooks/use-activities";
 import { useUsers } from "@/hooks/use-users";
+import { useAttachments } from "@/hooks/use-attachments";
 
 const activityTypes = {
     'Weekly Plan': 'weeklyPlans',
@@ -29,30 +30,31 @@ export default function ReportsPage() {
   const [reportData, setReportData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const { activities } = useActivities();
+  const { attachments } = useAttachments();
   const { users } = useUsers();
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
 
   const handleGenerateReport = async (config: any) => {
     setIsLoading(true);
-    setSelectedActivities([]); // Reset selection on new report
+    setSelectedActivities([]);
 
-    // Filter activities based on config
-    const filteredActivities = activities.filter(activity => {
-        const activityDate = new Date(activity.date);
+    const filterByConfig = (item: any) => {
+        const itemDate = new Date(item.date);
         
-        // Date range filtering
         const fromDate = config.date?.from ? new Date(config.date.from) : null;
         const toDate = config.date?.to ? new Date(config.date.to) : null;
-        if (fromDate && activityDate < fromDate) return false;
-        if (toDate && activityDate > toDate) return false;
+        if (fromDate && itemDate < fromDate) return false;
+        if (toDate && itemDate > toDate) return false;
 
-        // User filtering
-        if (config.selectedUser !== 'all' && activity.userId !== config.selectedUser) {
+        if (config.selectedUser !== 'all' && item.userId !== config.selectedUser) {
             return false;
         }
         
         return true;
-    });
+    }
+
+    const filteredActivities = activities.filter(filterByConfig);
+    const filteredAttachments = attachments.filter(filterByConfig);
 
     const totalActivities = filteredActivities.length;
     const peopleReached = filteredActivities.reduce((acc, a) => {
@@ -73,6 +75,7 @@ export default function ReportsPage() {
         tish: 0,
         cornerToCorner: 0,
         supportGroups: 0,
+        attachments: filteredAttachments.length,
     };
     
     let mostActiveCategoryCount = 0;
@@ -100,6 +103,7 @@ export default function ReportsPage() {
       summary,
       breakdown,
       activities: filteredActivities,
+      attachments: filteredAttachments,
       config,
       users,
     });
@@ -125,6 +129,7 @@ export default function ReportsPage() {
           <ReportSummary data={reportData} selectedActivitiesForDownload={selectedActivities} />
           <ActivityBreakdown 
             data={(reportData as any).breakdown}
+            allAttachmentsForReport={(reportData as any).attachments}
             selectedActivities={selectedActivities}
             onSelectionChange={setSelectedActivities}
           />

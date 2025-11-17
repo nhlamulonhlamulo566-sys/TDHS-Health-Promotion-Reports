@@ -38,9 +38,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import useStore from "@/lib/store";
 import { useFirebase, useUser } from "@/firebase";
 import { TimePicker } from "@/components/ui/time-picker";
-import { FileUpload } from "@/components/ui/file-upload";
 import { useUsers } from "@/hooks/use-users";
-import { prepareActivityData } from "@/lib/activity-utils";
 
 const outbreakResponseFormSchema = z.object({
   date: z.date({
@@ -58,8 +56,6 @@ const outbreakResponseFormSchema = z.object({
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
-  registerFile: z.any().optional(),
-  pictureFile: z.any().optional(),
 }).refine(data => {
     if (data.diseaseType === 'Other' && (!data.otherDiseaseType || data.otherDiseaseType.trim() === '')) {
         return false;
@@ -100,8 +96,6 @@ const defaultValues: Partial<OutbreakResponseFormValues> = {
   notes: "",
   startTime: "",
   endTime: "",
-  registerFile: null,
-  pictureFile: null,
 };
 
 const diseaseTypes = [
@@ -139,7 +133,6 @@ export function OutbreakResponseForm() {
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
-  const [fileUploadKey, setFileUploadKey] = React.useState(Date.now());
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   
   const form = useForm<OutbreakResponseFormValues>({
@@ -195,8 +188,12 @@ export function OutbreakResponseForm() {
     
     setIsSubmitting(true);
     try {
-        const { activityData, uploadTasks } = await prepareActivityData(data, 'Outbreak Response');
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData, uploadTasks);
+        const activityData = {
+          date: data.date.toISOString(),
+          type: 'Outbreak Response',
+          details: data,
+        };
+        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
 
         toast({
         title: "Outbreak Response Saved!",
@@ -204,7 +201,6 @@ export function OutbreakResponseForm() {
         });
         form.reset(defaultValues);
         setDuration(null);
-        setFileUploadKey(Date.now());
     } catch (error: any) {
         console.error("Failed to save outbreak response:", error);
         toast({
@@ -482,49 +478,6 @@ export function OutbreakResponseForm() {
                 </FormItem>
               )}
             />
-            
-            <div className="space-y-2">
-                <FormLabel>Attachments</FormLabel>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                    control={form.control}
-                    name="registerFile"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormControl>
-                            <FileUpload
-                              key={fileUploadKey}
-                              onFileSelect={(file) => field.onChange(file)}
-                              title="Click to upload register"
-                              subtitle="PDF, DOC, or images"
-                              icon="file"
-                            />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={form.control}
-                    name="pictureFile"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormControl>
-                            <FileUpload
-                              key={fileUploadKey}
-                              onFileSelect={(file) => field.onChange(file)}
-                              title="Click to upload pictures"
-                              subtitle="PNG, JPG, GIF"
-                              accept="image/*"
-                              icon="image"
-                            />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                </div>
-            </div>
 
             <FormField
               control={form.control}
@@ -554,3 +507,5 @@ export function OutbreakResponseForm() {
     </Card>
   );
 }
+
+    

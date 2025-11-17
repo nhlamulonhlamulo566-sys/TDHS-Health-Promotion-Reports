@@ -40,9 +40,7 @@ import { TimePicker } from "@/components/ui/time-picker";
 import React from "react";
 import useStore from "@/lib/store";
 import { useFirebase, useUser } from "@/firebase";
-import { FileUpload } from "@/components/ui/file-upload";
 import { useUsers } from "@/hooks/use-users";
-import { prepareActivityData } from "@/lib/activity-utils";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const topics = [
@@ -68,8 +66,6 @@ const healthTalkFormSchema = z.object({
   endTime: z.string().min(1, "End time is required"),
   peopleReached: z.coerce.number().min(1, "Please enter a number."),
   notes: z.string().optional(),
-  registerFile: z.any().optional(),
-  pictureFile: z.any().optional(),
 }).refine(data => {
     if (data.topics.includes('other') && (!data.otherTopic || data.otherTopic.trim() === '')) {
         return false;
@@ -90,8 +86,6 @@ const defaultValues: Partial<HealthTalkFormValues> = {
   notes: "",
   startTime: "",
   endTime: "",
-  registerFile: null,
-  pictureFile: null,
 };
 
 export function HealthTalkForm() {
@@ -101,7 +95,6 @@ export function HealthTalkForm() {
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
-  const [fileUploadKey, setFileUploadKey] = React.useState(Date.now());
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   
   const form = useForm<HealthTalkFormValues>({
@@ -160,8 +153,12 @@ export function HealthTalkForm() {
     
     setIsSubmitting(true);
     try {
-        const { activityData, uploadTasks } = await prepareActivityData(data, 'Health Talk');
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData, uploadTasks);
+        const activityData = {
+          date: data.date.toISOString(),
+          type: 'Health Talk',
+          details: data,
+        };
+        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
         
         toast({
             title: "Health Talk Saved!",
@@ -169,7 +166,6 @@ export function HealthTalkForm() {
         });
         form.reset(defaultValues);
         setDuration(null);
-        setFileUploadKey(Date.now());
     } catch (error: any) {
         console.error("Failed to save health talk:", error);
         toast({
@@ -396,48 +392,6 @@ export function HealthTalkForm() {
                 </FormItem>
               )}
             />
-            <div className="space-y-4">
-              <FormLabel>Attachments</FormLabel>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="registerFile"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <FileUpload
-                          key={fileUploadKey}
-                          onFileSelect={(file) => field.onChange(file)}
-                          title="Click to upload register"
-                          subtitle="PDF, DOC, or images"
-                          icon="file"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="pictureFile"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <FileUpload
-                          key={fileUploadKey}
-                          onFileSelect={(file) => field.onChange(file)}
-                          title="Click to upload pictures"
-                          subtitle="PNG, JPG, GIF"
-                          accept="image/*"
-                          icon="image"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
 
             <FormField
               control={form.control}
@@ -468,7 +422,6 @@ export function HealthTalkForm() {
                 onClick={() => {
                   form.reset(defaultValues);
                   setDuration(null);
-                  setFileUploadKey(Date.now());
                 }}
               >
                 Cancel
@@ -480,3 +433,4 @@ export function HealthTalkForm() {
     </Card>
   );
 }
+    

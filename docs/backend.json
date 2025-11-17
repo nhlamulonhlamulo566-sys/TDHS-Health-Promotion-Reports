@@ -73,6 +73,23 @@
         }
       },
       "required": ["id", "userId", "date", "type", "details", "createdAt"]
+    },
+    "Attachment": {
+        "title": "Attachment",
+        "type": "object",
+        "description": "Represents an uploaded file attachment.",
+        "properties": {
+            "id": { "type": "string", "description": "Unique identifier for the attachment." },
+            "userId": { "type": "string", "description": "The ID of the user who uploaded it." },
+            "district": { "type": "string", "description": "The district the user belongs to." },
+            "date": { "type": "string", "format": "date-time" },
+            "title": { "type": "string" },
+            "notes": { "type": "string" },
+            "registerAttachmentUrl": { "type": "string", "format": "uri" },
+            "pictureAttachmentUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
+            "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "userId", "date", "title", "createdAt"]
     }
   },
   "auth": {
@@ -93,8 +110,12 @@
         "$ref": "#/entities/Activity"
       },
       "description": "Stores all user activities."
+    },
+    "/attachments/{attachmentId}": {
+        "schema": {
+            "$ref": "#/entities/Attachment"
+        },
+        "description": "Stores all user file attachments."
     }
   }
 }
-
-    

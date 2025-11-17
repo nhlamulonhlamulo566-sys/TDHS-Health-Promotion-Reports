@@ -2,23 +2,22 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, doc, getDoc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
 import { useFirestore, useUser } from '@/firebase';
-import useStore from '@/lib/store';
+import useStore, { UserProfile } from '@/lib/store';
 import { useToast } from './use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { UserProfile } from '@/lib/store';
 
-export function useUsers() {
-    const { users, setUsers } = useStore();
+export function useAttachments() {
+    const { attachments, setAttachments } = useStore();
     const [isLoading, setIsLoading] = useState(true);
     const firestore = useFirestore();
     const { user } = useUser();
     const { toast } = useToast();
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-     useEffect(() => {
+    useEffect(() => {
         const fetchUserProfile = async () => {
           if (user && firestore) {
             const userDocRef = doc(firestore, 'users', user.uid);
@@ -31,7 +30,7 @@ export function useUsers() {
                 console.error("Error fetching user profile", e);
             }
           }
-          if (!user) {
+           if (!user) {
             setUserProfile(null);
           }
         };
@@ -41,54 +40,58 @@ export function useUsers() {
     useEffect(() => {
         if (!firestore || !user) {
             setIsLoading(false);
-            setUsers([]);
+            setAttachments([]); 
             return;
         }
-
+        
         if (!userProfile) {
             return;
         }
 
         setIsLoading(true);
         
-        let usersQuery;
+        let attachmentsQuery;
         if (userProfile.role === 'Super Administrator') {
-            usersQuery = query(collection(firestore, 'users'));
+            attachmentsQuery = query(collection(firestore, 'attachments'));
         } else if (userProfile.role === 'Administrator') {
-             if (userProfile.district) {
-                usersQuery = query(
-                    collection(firestore, 'users'),
+            if (userProfile.district) {
+                attachmentsQuery = query(
+                    collection(firestore, 'attachments'),
                     where('district', '==', userProfile.district)
                 );
             } else {
-                usersQuery = query(collection(firestore, 'users'), where('uid', '==', userProfile.id));
+                setAttachments([]);
+                setIsLoading(false);
+                return;
             }
         } else {
-            usersQuery = query(collection(firestore, 'users'), where('uid', '==', userProfile.id));
+            attachmentsQuery = query(
+                collection(firestore, 'attachments'),
+                where('userId', '==', userProfile.id)
+            );
         }
 
-
-        const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
-            const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
-            setUsers(usersData);
+        const unsubscribe = onSnapshot(attachmentsQuery, (snapshot) => {
+            const attachmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+            setAttachments(attachmentsData);
             setIsLoading(false);
         }, (error) => {
-            console.error("Error fetching users:", error);
-            const permissionError = new FirestorePermissionError({
-                path: 'users',
+            console.error("Error fetching attachments:", error);
+             const permissionError = new FirestorePermissionError({
+                path: 'attachments', 
                 operation: 'list',
             });
             errorEmitter.emit('permission-error', permissionError);
             toast({
                 title: "Error",
-                description: "Could not fetch users. You may not have the required permissions.",
+                description: "Could not fetch attachments. You may not have the required permissions.",
                 variant: "destructive",
             });
             setIsLoading(false);
         });
 
         return () => unsubscribe();
-    }, [firestore, user, userProfile, setUsers, toast]);
+    }, [firestore, user, userProfile, setAttachments, toast]);
 
-    return { users, isLoading };
+    return { attachments, isLoading };
 }

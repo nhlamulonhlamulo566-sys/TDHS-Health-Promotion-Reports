@@ -21,18 +21,30 @@ export function useActivities() {
         const fetchUserProfile = async () => {
           if (user && firestore) {
             const userDocRef = doc(firestore, 'users', user.uid);
-            const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) {
-              setUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
+            try {
+                const docSnap = await getDoc(userDocRef);
+                if (docSnap.exists()) {
+                  setUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
+                }
+            } catch (e) {
+                console.error("Error fetching user profile", e);
             }
+          }
+           if (!user) {
+            setUserProfile(null);
           }
         };
         fetchUserProfile();
     }, [user, firestore]);
 
     useEffect(() => {
-        if (!firestore || !userProfile) {
-            if (!user) setIsLoading(false);
+        if (!firestore || !user) {
+            setIsLoading(false);
+            setActivities([]); 
+            return;
+        }
+        
+        if (!userProfile) {
             return;
         }
 
@@ -48,7 +60,6 @@ export function useActivities() {
                     where('district', '==', userProfile.district)
                 );
             } else {
-                // Admin with no district sees nothing for now. Can be changed.
                 setActivities([]);
                 setIsLoading(false);
                 return;
@@ -67,7 +78,7 @@ export function useActivities() {
         }, (error) => {
             console.error("Error fetching activities:", error);
              const permissionError = new FirestorePermissionError({
-                path: 'activities', // Use a general path as it could be filtered or not
+                path: 'activities', 
                 operation: 'list',
             });
             errorEmitter.emit('permission-error', permissionError);
@@ -80,7 +91,7 @@ export function useActivities() {
         });
 
         return () => unsubscribe();
-    }, [firestore, userProfile, setActivities, toast, user]);
+    }, [firestore, user, userProfile, setActivities, toast]);
 
     return { activities, isLoading };
 }
