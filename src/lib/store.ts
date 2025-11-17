@@ -152,6 +152,11 @@ const useStore = create<StoreState>((set, get) => ({
         await updateDoc(docRef, updatePayload);
       }
       
+      // Reset state after a brief delay to allow UI to show 100% progress
+      setTimeout(() => {
+        set({ isUploading: false, uploadProgress: {} });
+      }, 500);
+      
       return docRef.id;
 
     } catch (error: any) {
@@ -166,11 +171,10 @@ const useStore = create<StoreState>((set, get) => ({
             },
             error
         );
+        // Reset state immediately on error
+        set({ isUploading: false, uploadProgress: {} });
         // We throw the error so the form's own catch block can handle it.
         throw permissionError;
-    } finally {
-        // THIS IS THE CRITICAL FIX: Always reset the loading state.
-        set({ isUploading: false, uploadProgress: {} });
     }
   },
 

@@ -21,7 +21,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser } from '@/firebase';
 import { useAttachments } from '@/hooks/use-attachments';
 import { useUsers } from '@/hooks/use-users';
-import Link from 'next/link';
 
 export function RecentAttachments() {
   const { toast } = useToast();
@@ -32,6 +31,7 @@ export function RecentAttachments() {
   const { user: currentUser } = useUser();
   const currentUserProfile = users.find(u => u.id === currentUser?.uid);
   const isAdministrator = currentUserProfile?.role === 'Administrator' || currentUserProfile?.role === 'Super Administrator';
+  const [expandedPictures, setExpandedPictures] = React.useState<{[key: string]: boolean}>({});
 
   const handleDelete = async (id: string) => {
     if (!firestore) return;
@@ -68,15 +68,55 @@ export function RecentAttachments() {
                       
                       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                         {attachment.registerAttachmentUrl && (
-                            <Link href={attachment.registerAttachmentUrl} target="_blank" className="flex items-center gap-1 hover:text-primary">
+                            <button
+                              onClick={() => {
+                                const a = document.createElement('a');
+                                a.href = attachment.registerAttachmentUrl!;
+                                a.download = attachment.title || 'register';
+                                a.target = '_blank';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                              }}
+                              className="flex items-center gap-1 hover:text-primary cursor-pointer"
+                            >
                                 <FileIcon className="size-3" />
-                                <span>Register</span>
-                            </Link>
+                                <span>Download Register</span>
+                            </button>
                         )}
                         {attachment.pictureAttachmentUrls && attachment.pictureAttachmentUrls.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <ImageIcon className="size-3" />
-                                <span>{attachment.pictureAttachmentUrls.length} Picture{attachment.pictureAttachmentUrls.length > 1 ? 's' : ''}</span>
+                            <div className="flex flex-col gap-1">
+                                <button
+                                  onClick={() => setExpandedPictures(prev => ({ ...prev, [attachment.id]: !prev[attachment.id] }))}
+                                  className="flex items-center gap-2 hover:text-primary cursor-pointer"
+                                >
+                                    <ImageIcon className="size-3" />
+                                    <span>{attachment.pictureAttachmentUrls.length} Picture{attachment.pictureAttachmentUrls.length > 1 ? 's' : ''}</span>
+                                </button>
+                                {expandedPictures[attachment.id] && (
+                                    <div className="mt-2 grid grid-cols-2 gap-2 p-2 bg-secondary rounded">
+                                        {attachment.pictureAttachmentUrls.map((url, idx) => (
+                                            <button
+                                              key={idx}
+                                              onClick={() => {
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = `${attachment.title}-picture-${idx + 1}`;
+                                                a.target = '_blank';
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                document.body.removeChild(a);
+                                              }}
+                                              className="relative group"
+                                            >
+                                                <img src={url} alt={`Picture ${idx + 1}`} className="h-16 w-16 object-cover rounded border" />
+                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded transition">
+                                                    <span className="text-white text-xs font-semibold">Download</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                       </div>
