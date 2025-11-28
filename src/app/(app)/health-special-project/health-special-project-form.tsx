@@ -5,15 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { format, differenceInMinutes } from "date-fns";
-import {
-  CalendarIcon,
-  MapPin,
-  PlusCircle,
-  Users,
-  Loader2,
-  Clock,
-  Save,
-} from "lucide-react";
+import { CalendarIcon, PlusCircle, Save, Users, MapPin, Loader2, Clock, HeartHandshake } from "lucide-react";
+import React from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -30,63 +23,27 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TimePicker } from "@/components/ui/time-picker";
-import React from "react";
 import useStore from "@/lib/store";
 import { useFirebase, useUser } from "@/firebase";
+import { TimePicker } from "@/components/ui/time-picker";
 import { useUsers } from "@/hooks/use-users";
 
-const supportGroupFormSchema = z.object({
+const specialProjectSchema = z.object({
   date: z.date({
-    required_error: "A date is required.",
+    required_error: "A date for the project is required.",
   }),
-  venue: z.string().min(1, "Venue is required."),
-  supportGroupType: z.string().min(1, "Support group type is required."),
-  otherSupportGroupType: z.string().optional(),
-  topic: z.string().min(1, "Topic is required."),
-  otherTopic: z.string().optional(),
-  physicalActivity: z.string().min(1, "Physical activity is required."),
-  otherPhysicalActivity: z.string().optional(),
+  projectName: z.string().min(1, "Project name is required."),
+  location: z.string().min(1, "Location is required."),
+  description: z.string().min(1, "Project description is required."),
+  peopleReached: z.coerce.number().min(1, "Please enter a valid number."),
+  notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
-  peopleReached: z.coerce.number().min(1, "Please enter a number."),
-  notes: z.string().optional(),
-}).refine(data => {
-    if (data.topic === 'Other' && (!data.otherTopic || data.otherTopic.trim() === '')) {
-        return false;
-    }
-    return true;
-}, {
-    message: "Please specify the 'Other' topic.",
-    path: ["otherTopic"],
-}).refine(data => {
-    if (data.supportGroupType === 'Other' && (!data.otherSupportGroupType || data.otherSupportGroupType.trim() === '')) {
-        return false;
-    }
-    return true;
-}, {
-    message: "Please specify the 'Other' support group type.",
-    path: ["otherSupportGroupType"],
-}).refine(data => {
-    if (data.physicalActivity === 'Other' && (!data.otherPhysicalActivity || data.otherPhysicalActivity.trim() === '')) {
-        return false;
-    }
-    return true;
-}, {
-    message: "Please specify the 'Other' physical activity.",
-    path: ["otherPhysicalActivity"],
 }).refine(data => {
     const [startHour, startMinute] = data.startTime.split(':').map(Number);
     const [endHour, endMinute] = data.endTime.split(':').map(Number);
@@ -98,53 +55,19 @@ const supportGroupFormSchema = z.object({
     path: ["endTime"],
 });
 
+type SpecialProjectFormValues = z.infer<typeof specialProjectSchema>;
 
-type SupportGroupFormValues = z.infer<typeof supportGroupFormSchema>;
-
-const defaultValues: Partial<SupportGroupFormValues> = {
-  venue: "",
-  supportGroupType: "",
-  otherSupportGroupType: "",
-  topic: "",
-  otherTopic: "",
-  physicalActivity: "",
-  otherPhysicalActivity: "",
+const defaultValues: Partial<SpecialProjectFormValues> = {
+  projectName: "",
+  location: "",
+  description: "",
   peopleReached: 0,
   notes: "",
   startTime: "",
   endTime: "",
 };
 
-const groupTypes = [
-  "Mental Health",
-  "Chronic Illness",
-  "Substance Abuse",
-  "Grief and Loss",
-  "Caregivers",
-  "Disability",
-  "Other",
-];
-
-const topics = [
-  "Coping Strategies",
-  "Adherence",
-  "Healthy Lifestyles",
-  "Stress Reduction",
-  "Peer Support",
-  "Other",
-];
-
-const physicalActivities = [
-    "Yoga",
-    "Meditation",
-    "Walking Group",
-    "Stretching",
-    "Aerobics",
-    "No Activity",
-    "Other",
-]
-
-export function SupportGroupForm() {
+export function HealthSpecialProjectForm() {
   const { toast } = useToast();
   const addActivity = useStore((state) => state.addActivity);
   const { firestore, app } = useFirebase();
@@ -153,25 +76,14 @@ export function SupportGroupForm() {
   const currentUserProfile = users.find(u => u.id === user?.uid);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   
-  const form = useForm<SupportGroupFormValues>({
-    resolver: zodResolver(supportGroupFormSchema),
+  const form = useForm<SpecialProjectFormValues>({
+    resolver: zodResolver(specialProjectSchema),
     defaultValues,
   });
 
   const [duration, setDuration] = React.useState<string | null>(null);
-
   const watchStartTime = form.watch("startTime");
   const watchEndTime = form.watch("endTime");
-  
-  const watchTopic = form.watch("topic");
-  const isOtherTopicSelected = watchTopic === "Other";
-
-  const watchSupportGroupType = form.watch("supportGroupType");
-  const isOtherSupportGroupTypeSelected = watchSupportGroupType === "Other";
-
-  const watchPhysicalActivity = form.watch("physicalActivity");
-  const isOtherPhysicalActivitySelected = watchPhysicalActivity === "Other";
-
 
   React.useEffect(() => {
     if (watchStartTime && watchEndTime) {
@@ -182,13 +94,7 @@ export function SupportGroupForm() {
 
       if (endDate <= startDate) {
         setDuration(null);
-        form.setError("endTime", {
-          type: "manual",
-          message: "End time must be after start time.",
-        });
         return;
-      } else {
-        form.clearErrors("endTime");
       }
 
       const diff = differenceInMinutes(endDate, startDate);
@@ -205,7 +111,7 @@ export function SupportGroupForm() {
     }
   }, [watchStartTime, watchEndTime, form]);
 
-  async function onSubmit(data: SupportGroupFormValues) {
+  async function onSubmit(data: SpecialProjectFormValues) {
     if (!firestore || !user || !currentUserProfile?.district || !app) {
       toast({
           title: 'Error',
@@ -219,19 +125,19 @@ export function SupportGroupForm() {
     try {
         const activityData = {
           date: data.date.toISOString(),
-          type: 'Support Group',
+          type: 'Health Special Project',
           details: data,
         };
         await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
-        
+
         toast({
-        title: "Support Group Session Saved!",
-        description: "The new support group session has been recorded.",
+        title: "Project Saved!",
+        description: "The new health special project has been recorded.",
         });
         form.reset(defaultValues);
         setDuration(null);
     } catch (error: any) {
-        console.error("Failed to save support group session:", error);
+        console.error("Failed to save project:", error);
         toast({
           title: "Save failed",
           description: error?.message || "You do not have permission to save this data.",
@@ -245,12 +151,15 @@ export function SupportGroupForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add New Support Group Session</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+            <PlusCircle className="h-6 w-6" />
+            New Health Special Project
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
                 name="date"
@@ -292,18 +201,17 @@ export function SupportGroupForm() {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
-                name="venue"
+                name="projectName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Venue *</FormLabel>
+                    <FormLabel>Project Name *</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <HeartHandshake className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Enter venue"
+                          placeholder="Enter project name..."
                           className="pl-9"
                           {...field}
                         />
@@ -315,7 +223,7 @@ export function SupportGroupForm() {
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
               <FormField
                 control={form.control}
                 name="startTime"
@@ -357,159 +265,62 @@ export function SupportGroupForm() {
                   )}
                 >
                   <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                  {duration || "Select times"}
+                  {duration || "N/A"}
                 </div>
               </FormItem>
             </div>
+            
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Location *</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Enter detailed location..."
+                        className="pl-9"
+                        {...field}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <FormField
+             <FormField
               control={form.control}
-              name="supportGroupType"
+              name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Support Group Type *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select group type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {groupTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Project Description *</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Briefly describe the project..."
+                      rows={3}
+                      {...field}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            {isOtherSupportGroupTypeSelected && (
-              <FormField
-                control={form.control}
-                name="otherSupportGroupType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Please specify other group type</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter other group type..."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            <FormField
-              control={form.control}
-              name="topic"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Topic Covered *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a topic" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {topics.map((topic) => (
-                        <SelectItem key={topic} value={topic}>
-                          {topic}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             {isOtherTopicSelected && (
-              <FormField
-                control={form.control}
-                name="otherTopic"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Please specify other topic</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter other topic..."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            <FormField
-              control={form.control}
-              name="physicalActivity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Physical Activity *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select physical activity" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {physicalActivities.map((activity) => (
-                        <SelectItem key={activity} value={activity}>
-                          {activity}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             {isOtherPhysicalActivitySelected && (
-              <FormField
-                control={form.control}
-                name="otherPhysicalActivity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Please specify other physical activity</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter other physical activity..."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
             
             <FormField
               control={form.control}
               name="peopleReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>People Reached *</FormLabel>
+                  <FormLabel>Number of People Reached *</FormLabel>
                   <FormControl>
                     <div className="relative">
                         <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                         type="number"
-                        placeholder="Enter number of people reached"
+                        placeholder="0"
                         className="pl-9"
                         {...field}
                         onChange={(e) =>
@@ -531,7 +342,7 @@ export function SupportGroupForm() {
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Additional notes..."
+                      placeholder="Additional notes about the project..."
                       rows={4}
                       {...field}
                     />
@@ -541,22 +352,10 @@ export function SupportGroupForm() {
               )}
             />
 
-            <div className="flex items-center gap-4">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {isSubmitting ? "Saving..." : "Save Session"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  form.reset(defaultValues);
-                  setDuration(null);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
+            <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSubmitting ? "Saving..." : "Save Project"}
+            </Button>
           </form>
         </Form>
       </CardContent>

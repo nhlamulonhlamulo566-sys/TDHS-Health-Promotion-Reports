@@ -30,6 +30,16 @@ const getGradeLevelDisplay = (grades: string[] | string) => {
     return grades;
 };
 
+const getTopicDisplay = (details: any) => {
+    const { topic, otherTopic } = details;
+    if (!topic) return 'No topics';
+    if (Array.isArray(topic)) {
+        const displayTopics = topic.map(t => (t === 'Other' && otherTopic ? otherTopic : t));
+        return displayTopics.join(', ');
+    }
+    return topic === 'Other' && otherTopic ? otherTopic : topic;
+}
+
 
 export function RecentSchoolVisits() {
   const { toast } = useToast();
@@ -73,7 +83,7 @@ export function RecentSchoolVisits() {
             {visits.map((visit) => (
                 <div key={visit.id} className="flex items-start justify-between gap-4 rounded-lg p-4 hover:bg-secondary">
                     <div className="grid gap-1 flex-1">
-                      <p className="font-semibold">{visit.details.topic === 'Other' ? visit.details.otherTopic : visit.details.topic}</p>
+                      <p className="font-semibold">{getTopicDisplay(visit.details)}</p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <span>{visit.details.schoolName}</span>
                           <span className="text-xs text-muted-foreground">({getGradeLevelDisplay(visit.details.gradeLevel)})</span>

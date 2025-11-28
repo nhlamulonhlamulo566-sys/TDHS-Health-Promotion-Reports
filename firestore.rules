@@ -1,93 +1,172 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions to keep rules DRY and readable
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
+    // Helper functions
     function isSuperAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Super Administrator';
     }
 
     function isAdministrator() {
-      let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-      return userRole == 'Administrator' || userRole == 'Super Administrator';
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrator';
+    }
+
+    function userDistrict() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.district;
     }
     
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
     
-    function isFromSameDistrict(resource) {
-        let userDistrict = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.district;
-        return resource.data.district == userDistrict;
+    function isActivityOwner(activity) {
+        return request.auth.uid == activity.userId;
     }
 
+    // ----------------------------
+    // 👤 USERS COLLECTION
+    // ----------------------------
     match /users/{userId} {
-      // READ:
-      // - Any authenticated user can read any profile (needed for dropdowns, etc.)
-      allow read: if isSignedIn();
-
-      // CREATE:
-      // - Only Super Admins and Admins can create new users.
-      // - The creator cannot assign a role higher than or equal to their own.
-      allow create: if isAdministrator()
-                    && request.resource.data.role != 'Super Administrator'
-                    && (isSuperAdmin() || request.resource.data.role != 'Administrator');
-
-      // UPDATE:
-      // - A user can update their own profile.
-      // - A Super Admin can update any profile.
-      // - An Admin can update any profile EXCEPT other Admins or Super Admins.
-      // - No one can change their own role.
-      allow update: if isSignedIn() &&
-                    (isOwner(userId) || isSuperAdmin() || (isAdministrator() && resource.data.role != 'Administrator' && resource.data.role != 'Super Administrator')) &&
-                    request.resource.data.role == resource.data.role;
-                    
-      // DELETE:
-      // - Only Super Admins can delete users.
-      // - You cannot delete yourself.
-      allow delete: if isSuperAdmin() && request.auth.uid != userId;
+      allow read: if isOwner(userId) || isAdministrator() || isSuperAdmin();
+      allow list: if isAdministrator() || isSuperAdmin();
+      // Allow user creation via client, but only with specific, validated fields
+      allow create: if request.auth != null &&
+                      request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'district', 'persalNumber', 'organization', 'phone']) &&
+                      request.resource.data.uid == request.auth.uid;
+      allow update: if (isOwner(userId) || isAdministrator() || isSuperAdmin()) &&
+                       request.resource.data.keys().hasOnly(['displayName', 'phone', 'persalNumber', 'district', 'organization', 'role']);
+      allow delete: if isAdministrator() || isSuperAdmin();
     }
 
+    // ----------------------------
+    // 📋 ACTIVITIES COLLECTION
+    // ----------------------------
     match /activities/{activityId} {
-        // READ:
-        // - Super Admins can read everything.
-        // - Admins can read activities from their district.
-        // - Users can read their own activities.
-        allow read: if isSignedIn() && (isSuperAdmin() || isOwner(resource.data.userId) || (isAdministrator() && isFromSameDistrict(resource)));
-
-        // CREATE, UPDATE:
-        // - Users can create/update their own activities.
-        allow write: if isSignedIn() && isOwner(request.resource.data.userId);
-
-        // DELETE:
-        // - Users can delete their own activities.
-        // - Admins can delete activities from their district.
-        // - Super Admins can delete any activity.
-        allow delete: if isSignedIn() && (isSuperAdmin() || isOwner(resource.data.userId) || (isAdministrator() && isFromSameDistrict(resource)));
+      // READ/LIST: Super Admins see all. Admins see their district. Users see their own.
+      allow read, list: if isSuperAdmin() || 
+                        (isAdministrator() && resource.data.district == userDistrict()) ||
+                        (request.auth != null && resource.data.userId == request.auth.uid);
+      
+      // CREATE: Logged-in users can create activities for themselves with validated data structures.
+      allow create: if request.auth != null && 
+                       request.resource.data.userId == request.auth.uid &&
+                       isValidActivity(request.resource.data);
+      
+      // UPDATE: Owners, Admins, and Super Admins can update.
+      allow update: if isSuperAdmin() ||
+                      (isAdministrator() && resource.data.district == userDistrict()) ||
+                      isActivityOwner(resource.data);
+                      
+      // DELETE: Owners, Admins, and Super Admins can delete.
+      allow delete: if isSuperAdmin() ||
+                      (isAdministrator() && resource.data.district == userDistrict()) ||
+                      isActivityOwner(resource.data);
     }
     
-    match /attachments/{attachmentId} {
-        // READ:
-        // - Super Admins can read everything.
-        // - Admins can read attachments from their district.
-        // - Users can read their own attachments.
-        allow read: if isSignedIn() && (isSuperAdmin() || isOwner(resource.data.userId) || (isAdministrator() && isFromSameDistrict(resource)));
+    // --- Data Validation Functions ---
+    function isValidActivity(data) {
+      return data.type == 'Weekly Plan' ? isValidWeeklyPlan(data)
+           : data.type == 'Health Talk' ? isValidHealthTalk(data)
+           : data.type == 'School Visit' ? isValidSchoolVisit(data)
+           : data.type == 'Creche Visit' ? isValidCrecheVisit(data)
+           : data.type == 'Health Campaign' ? isValidHealthCampaign(data)
+           : data.type == 'Social Mobilization' ? isValidSocialMobilization(data)
+           : data.type == 'IMCI Training' ? isValidImciTraining(data)
+           : data.type == 'Outbreak Response' ? isValidOutbreakResponse(data)
+           : data.type == 'Support Group' ? isValidSupportGroup(data)
+           : data.type == 'Corner to Corner' ? isValidCornerToCorner(data)
+           : data.type == 'TISH' ? isValidTish(data)
+           : data.type == 'Document Upload' ? isValidDocumentUpload(data)
+           : data.type == 'Health Special Project' ? isValidHealthSpecialProject(data)
+           : false;
+    }
 
-        // CREATE, UPDATE:
-        // - Users can create/update their own attachments.
-        allow write: if isSignedIn() && isOwner(request.resource.data.userId);
+    function hasBaseActivityFields(data) {
+        return data.keys().hasAll(['date', 'type', 'details', 'userId', 'district', 'createdAt']);
+    }
 
-        // DELETE:
-        // - Users can delete their own attachments.
-        // - Admins can delete attachments from their district.
-        // - Super Admins can delete any attachment.
-        allow delete: if isSignedIn() && (isSuperAdmin() || isOwner(resource.data.userId) || (isAdministrator() && isFromSameDistrict(resource)));
+    function isValidWeeklyPlan(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['activity', 'venue', 'nb', 'startTime', 'endTime', 'date']);
+    }
+
+    function isValidHealthTalk(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['venue', 'topics', 'startTime', 'endTime', 'peopleReached', 'date']) &&
+               (data.details.topics.hasAny(['other']) == false || data.details.keys().hasAll(['otherTopic']));
+    }
+
+    function isValidSchoolVisit(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['schoolName', 'gradeLevel', 'topic', 'studentsReached', 'startTime', 'endTime', 'date']) &&
+               (data.details.topic.hasAny(['Other']) == false || data.details.keys().hasAll(['otherTopic']));
+    }
+    
+    function isValidCrecheVisit(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['crecheName', 'ageGroup', 'topic', 'childrenMindersReached', 'parentsReached', 'childrenReached', 'startTime', 'endTime', 'date']) &&
+               (data.details.topic.hasAny(['Other']) == false || data.details.keys().hasAll(['otherTopic']));
+    }
+
+    function isValidHealthCampaign(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['campaignType', 'targetGroup', 'venue', 'location', 'peopleReached', 'startTime', 'endTime', 'date']) &&
+               (data.details.campaignType != 'Other' || data.details.keys().hasAll(['otherCampaignType'])) &&
+               (data.details.targetGroup != 'Other' || data.details.keys().hasAll(['otherTargetGroup']));
+    }
+    
+    function isValidSocialMobilization(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['location', 'campaignType', 'mobilizationMethod', 'topic', 'peopleReached', 'startTime', 'endTime', 'date']) &&
+               (data.details.campaignType.hasAny(['Other']) == false || data.details.keys().hasAll(['otherCampaignType'])) &&
+               (data.details.mobilizationMethod.hasAny(['Other']) == false || data.details.keys().hasAll(['otherMobilizationMethod'])) &&
+               (data.details.topic != 'Other' || data.details.keys().hasAll(['otherTopic']));
+    }
+
+    function isValidImciTraining(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['venue', 'peopleReached', 'traineeType', 'startTime', 'endTime', 'date']) &&
+               (data.details.traineeType != 'Other' || data.details.keys().hasAll(['otherTraineeType']));
+    }
+
+    function isValidOutbreakResponse(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['location', 'diseaseType', 'severityLevel', 'topic', 'peopleReached', 'startTime', 'endTime', 'date']) &&
+               (data.details.diseaseType != 'Other' || data.details.keys().hasAll(['otherDiseaseType'])) &&
+               (data.details.topic != 'Other' || data.details.keys().hasAll(['otherTopic']));
+    }
+
+    function isValidSupportGroup(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['venue', 'supportGroupType', 'topic', 'physicalActivity', 'peopleReached', 'startTime', 'endTime', 'date']) &&
+               (data.details.supportGroupType != 'Other' || data.details.keys().hasAll(['otherSupportGroupType'])) &&
+               (data.details.topic != 'Other' || data.details.keys().hasAll(['otherTopic'])) &&
+               (data.details.physicalActivity != 'Other' || data.details.keys().hasAll(['otherPhysicalActivity']));
+    }
+    
+    function isValidCornerToCorner(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['venue', 'services', 'startTime', 'endTime', 'peopleReached', 'date']) &&
+               (data.details.services.all(s => s.keys().hasAll(['id', 'label', 'peopleReached']))) &&
+               (!data.details.services.exists(s, s.id == 'other') || data.details.keys().hasAll(['otherTopic']));
+    }
+
+    function isValidTish(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['venue', 'services', 'startTime', 'endTime', 'peopleReached', 'date']) &&
+               (data.details.services.all(s => s.keys().hasAll(['id', 'label', 'peopleReached']))) &&
+               (!data.details.services.exists(s, s.id == 'other') || data.details.keys().hasAll(['otherTopic']));
+    }
+    
+    function isValidDocumentUpload(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['title', 'registerAttachment', 'pictureAttachment', 'notes']);
+    }
+
+    function isValidHealthSpecialProject(data) {
+        return hasBaseActivityFields(data) &&
+               data.details.keys().hasAll(['projectName', 'location', 'description', 'peopleReached', 'startTime', 'endTime', 'date']);
     }
   }
 }

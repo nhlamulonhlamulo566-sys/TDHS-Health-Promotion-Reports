@@ -1,243 +1,153 @@
-import { create } from "zustand";
+
+import { create } from 'zustand';
 import {
   doc,
   addDoc,
-  setDoc,
   deleteDoc,
   collection,
   serverTimestamp,
   type Firestore,
   updateDoc,
-  type DocumentReference,
-} from "firebase/firestore";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
-import type { FirebaseApp } from "firebase/app";
-import { uploadFile } from "./upload-utils";
-import type { Activity, AttachmentDoc, UploadTasks, UserProfile, UploadProgress } from "./types";
+} from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { uploadFile } from './activity-utils';
+import { FirebaseApp } from 'firebase/app';
+
+export interface Activity {
+  id: string;
+  date: string;
+  type: string; // e.g., 'Weekly Plan', 'Health Talk'
+  details: any; // This will hold specific data for the activity type
+  userId?: string;
+  district?: string;
+  createdAt: any;
+}
+
+export interface UserProfile {
+    id: string;
+    displayName: string;
+    email: string;
+    role: string;
+    district?: string;
+    [key: string]: any;
+}
 
 interface StoreState {
   activities: Activity[];
-  attachments: AttachmentDoc[];
   users: UserProfile[];
-  isUploading: boolean;
-  uploadProgress: UploadProgress;
-
   setActivities: (activities: Activity[]) => void;
-  setAttachments: (attachments: AttachmentDoc[]) => void;
   setUsers: (users: UserProfile[]) => void;
-
-  addActivity: (
-    db: Firestore,
-    userId: string,
-    district: string,
-    activity: Omit<Activity, "id" | "userId" | "createdAt" | "district">
-  ) => Promise<string>;
-
-  addAttachment: (
-    db: Firestore,
-    app: FirebaseApp,
-    userId: string,
-    district: string,
-    attachment: { date: Date; title: string; notes?: string },
-    uploadTasks: UploadTasks
-  ) => Promise<string>;
-
-  deleteActivity: (db: Firestore, id: string) => Promise<void>;
-  deleteAttachment: (db: Firestore, id: string) => Promise<void>;
+  addActivity: (app: FirebaseApp, db: Firestore, userId: string, district: string, activity: Omit<Activity, 'id' | 'userId' | 'createdAt' | 'district'>) => Promise<void>;
+  addDocumentUpload: (app: FirebaseApp, db: Firestore, userId: string, district: string, attachmentData: { date: Date; title: string; notes?: string; }, uploadTasks: { registerFile?: File | null; pictureFile?: File | null; }) => Promise<void>;
+  deleteActivity: (db: Firestore, id: string) => void;
 }
 
-const useStore = create<StoreState>((set, get) => ({
-  activities: [],
-  attachments: [],
-  users: [],
-  isUploading: false,
-  uploadProgress: {},
-
-  setActivities: (activities) => set({ activities }),
-  setAttachments: (attachments) => set({ attachments }),
-  setUsers: (users) => set({ users }),
-
-  addActivity: async (db, userId, district, activity) => {
-    if (!userId) throw new Error("User is not authenticated.");
-    try {
-        const newActivity = {
-        ...activity,
-        userId,
-        district,
-        createdAt: serverTimestamp(),
+const useStore = create<StoreState>()(
+    (set) => ({
+      activities: [],
+      users: [],
+      setActivities: (activities) => set({ activities }),
+      setUsers: (users) => set({ users }),
+      addActivity: async (app, db, userId, district, activity) => {
+        if (!userId) {
+            console.error("User is not authenticated.");
+            throw new Error("User is not authenticated.");
         };
 
-        const docRef = await addDoc(collection(db, "activities"), newActivity);
-        return docRef.id;
-    } catch (serverError: any) {
-        const permissionError = new FirestorePermissionError(
-            {
-            path: "activities",
-            operation: "create",
-            requestResourceData: activity,
-            },
-            serverError
-        );
-        errorEmitter.emit("permission-error", permissionError);
-        throw permissionError;
-    }
-  },
+        const newActivity = {
+          ...activity,
+          userId,
+          district,
+          createdAt: serverTimestamp(),
+        };
 
-  addAttachment: async (db, app, userId, district, attachmentData, uploadTasks) => {
-    if (!userId) throw new Error("User not authenticated.");
-    if (!app) throw new Error("Firebase app not provided.");
-
-    console.log("[addAttachment] Starting attachment upload process", { userId, district, uploadTasks });
-    set({ isUploading: true, uploadProgress: {} });
-    let docRef: DocumentReference | null = null;
-
-    try {
-      // 1. Create Firestore doc with safe fields
-      const newAttachment: Omit<AttachmentDoc, "id"> = {
-        date: attachmentData.date.toISOString(),
-        title: attachmentData.title,
-        notes: attachmentData.notes || "",
-        userId,
-        district,
-        createdAt: serverTimestamp(),
-        registerAttachmentUrl: null,
-        pictureAttachmentUrls: [],
-        uploadStatus: 'pending',
-        uploadError: null,
-      };
-
-      // Create a document reference (not written yet) so we have an id to upload files under
-      docRef = doc(collection(db, "attachments"));
-      console.log("[addAttachment] Prepared Firestore document reference (not written yet):", docRef.id);
-
-      const updateProgress = (fileName: string, progress: number) => {
-        console.log(`[addAttachment] Progress update for ${fileName}: ${progress}%`);
-        set((state) => ({
-          uploadProgress: { ...state.uploadProgress, [fileName]: progress },
-        }));
-      };
-
-      const uploadPromises: Promise<any>[] = [];
-      const updatePayload: Partial<AttachmentDoc> = {};
-      
-      const uploadAndTrack = async (file: File, key: 'registerAttachmentUrl' | 'pictureAttachmentUrls') => {
         try {
-          console.log(`[addAttachment] Uploading file: ${file.name} to key: ${key}`);
-          const url = await uploadFile(app, file, docRef!.id, (p) => updateProgress(file.name, p));
-          console.log(`[addAttachment] File uploaded successfully: ${file.name} -> ${url}`);
-          if (key === 'registerAttachmentUrl') {
-            updatePayload.registerAttachmentUrl = url;
-          } else {
-            if (!updatePayload.pictureAttachmentUrls) {
-              updatePayload.pictureAttachmentUrls = [];
+            await addDoc(collection(db, 'activities'), newActivity);
+        } catch (serverError: any) {
+             const permissionError = new FirestorePermissionError({
+                path: 'activities',
+                operation: "create",
+                requestResourceData: newActivity,
+            }, serverError);
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError;
+        }
+      },
+      addDocumentUpload: async (app, db, userId, district, attachmentData, uploadTasks) => {
+        if (!userId) {
+            console.error("User is not authenticated.");
+            throw new Error("User is not authenticated.");
+        };
+
+        const newActivity = {
+          date: attachmentData.date.toISOString(),
+          type: 'Document Upload',
+          details: {
+            title: attachmentData.title,
+            notes: attachmentData.notes,
+            registerAttachment: null,
+            pictureAttachment: null,
+          },
+          userId,
+          district,
+          createdAt: serverTimestamp(),
+        };
+
+        let docRef;
+        try {
+            docRef = await addDoc(collection(db, 'activities'), newActivity);
+            
+            const uploadPromises = [];
+            let updatePayload: { [key: string]: any } = {};
+
+            if (uploadTasks?.registerFile) {
+                uploadPromises.push(
+                    uploadFile(app, uploadTasks.registerFile, docRef.id).then(url => {
+                        updatePayload['details.registerAttachment'] = url;
+                    })
+                );
             }
-            updatePayload.pictureAttachmentUrls.push(url);
-          }
-        } catch (uploadError) {
-          console.error(`[addAttachment] Failed to upload ${file.name}:`, uploadError);
-          // We throw here to make sure the Promise.all fails
-          throw uploadError;
-        }
-      };
-      
-      // 2. Handle Register File
-      if (uploadTasks?.registerFile) {
-        console.log("[addAttachment] Queuing register file for upload");
-        uploadPromises.push(uploadAndTrack(uploadTasks.registerFile, 'registerAttachmentUrl'));
-      }
+            if (uploadTasks?.pictureFile) {
+                 uploadPromises.push(
+                    uploadFile(app, uploadTasks.pictureFile, docRef.id).then(url => {
+                        updatePayload['details.pictureAttachment'] = url;
+                    })
+                );
+            }
+            
+            if(uploadPromises.length > 0) {
+                await Promise.all(uploadPromises);
+                if (Object.keys(updatePayload).length > 0) {
+                    await updateDoc(docRef, updatePayload);
+                }
+            }
 
-      // 3. Handle Picture Files
-      if (uploadTasks?.pictureFiles && uploadTasks.pictureFiles.length > 0) {
-        console.log(`[addAttachment] Queuing ${uploadTasks.pictureFiles.length} picture files for upload`);
-        uploadTasks.pictureFiles.forEach(file => {
-          uploadPromises.push(uploadAndTrack(file, 'pictureAttachmentUrls'));
-        });
-      }
-      
-      // 4. Wait for all uploads to settle
-      console.log(`[addAttachment] Waiting for ${uploadPromises.length} uploads to complete...`);
-      await Promise.all(uploadPromises);
-      console.log("[addAttachment] All uploads completed successfully");
 
-      // 5. Create the Firestore document now that uploads succeeded
-      const finalAttachment: Omit<AttachmentDoc, 'id'> = {
-        ...newAttachment,
-        registerAttachmentUrl: updatePayload.registerAttachmentUrl || null,
-        pictureAttachmentUrls: updatePayload.pictureAttachmentUrls || [],
-        uploadStatus: Object.keys(updatePayload).length > 0 ? 'complete' : 'failed',
-        uploadError: Object.keys(updatePayload).length > 0 ? undefined : 'No files were uploaded',
-      };
-
-      console.log('[addAttachment] Writing Firestore document with uploaded URLs', finalAttachment);
-      await setDoc(docRef, finalAttachment as any);
-      console.log('[addAttachment] Firestore document written:', docRef.id);
-
-      // Reset state after a brief delay to allow UI to show 100% progress
-      setTimeout(() => {
-        console.log("[addAttachment] Resetting upload state");
-        set({ isUploading: false, uploadProgress: {} });
-      }, 500);
-
-      console.log("[addAttachment] Upload process completed successfully");
-      return docRef.id;
-
-    } catch (error: any) {
-        console.error("[addAttachment] Upload process failed:", error);
-        const isCreateOp = !docRef;
-        // If an error occurs, especially during uploads, we need to inform the user.
-        // The FirestorePermissionError is a good way to wrap this.
-        const permissionError = new FirestorePermissionError(
-            {
-                path: isCreateOp ? "attachments" : `attachments/${docRef?.id}`,
+        } catch (serverError: any) {
+             const isCreateOp = !docRef;
+             const permissionError = new FirestorePermissionError({
+                path: isCreateOp ? 'activities' : `activities/${docRef?.id}`,
                 operation: isCreateOp ? "create" : "update",
-                requestResourceData: { message: "File upload or document operation failed", error: error?.message },
-            },
-            error
-        );
-        // If we created a doc, mark it as failed and store the error to help debugging
-        if (docRef) {
-          try {
-            await updateDoc(docRef, { uploadStatus: 'failed', uploadError: String(error?.message || error) } as any);
-          } catch (e) {
-            console.error('[addAttachment] Failed to write failure status to Firestore doc:', e);
-          }
+                requestResourceData: newActivity,
+            }, serverError);
+            errorEmitter.emit('permission-error', permissionError);
+            // Re-throw the error so the UI can handle it (e.g., stop loading state)
+            throw permissionError;
         }
-        // Reset state immediately on error
-        set({ isUploading: false, uploadProgress: {} });
-        // We throw the error so the form's own catch block can handle it.
-        throw permissionError;
-    }
-  },
-
-  deleteActivity: async (db, id) => {
-    try {
-      const activityRef = doc(db, "activities", id);
-      await deleteDoc(activityRef);
-    } catch (err) {
-      const permissionError = new FirestorePermissionError({
-        path: `activities/${id}`,
-        operation: "delete",
-      });
-      errorEmitter.emit("permission-error", permissionError);
-      throw permissionError;
-    }
-  },
-
-  deleteAttachment: async (db, id) => {
-    try {
-      const attachmentRef = doc(db, "attachments", id);
-      await deleteDoc(attachmentRef);
-    } catch (err) {
-      const permissionError = new FirestorePermissionError({
-        path: `attachments/${id}`,
-        operation: "delete",
-      });
-      errorEmitter.emit("permission-error", permissionError);
-      throw permissionError;
-    }
-  },
-}));
+      },
+      deleteActivity: (db, id) => {
+        const activityRef = doc(db, 'activities', id);
+        deleteDoc(activityRef)
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: activityRef.path,
+                operation: 'delete',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+      },
+    }),
+);
 
 export default useStore;
-export type { UserProfile };

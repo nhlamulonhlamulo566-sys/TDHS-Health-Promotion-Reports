@@ -13,7 +13,9 @@ export default function DashboardPage() {
   const { activities, isLoading } = useActivities();
 
   const dashboardData = useMemo(() => {
-    if (isLoading || !activities) return null;
+    if (isLoading || !activities) {
+        return { stats: null, chartData: null, recentActivities: null };
+    }
 
     const weeklyPlans = activities.filter(a => a.type === 'Weekly Plan').length;
     const healthTalks = activities.filter(a => a.type === 'Health Talk').length;
@@ -55,7 +57,8 @@ export default function DashboardPage() {
         .slice(0, 5);
 
     return { stats, chartData, recentActivities };
-  }, [activities, isLoading]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activities?.length, isLoading]);
 
   return (
     <div className="space-y-8">
@@ -63,7 +66,7 @@ export default function DashboardPage() {
         title="Welcome Back!"
         description="Here's a summary of your health reporting activities."
       />
-      {isLoading || !dashboardData ? (
+      {isLoading || !dashboardData.stats ? (
         <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Skeleton className="h-28" />

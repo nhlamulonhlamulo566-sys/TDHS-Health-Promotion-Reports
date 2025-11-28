@@ -68,7 +68,7 @@ const defaultValues: Partial<WeeklyPlanFormValues> = {
 export function WeeklyPlanForm() {
   const { toast } = useToast();
   const addActivityStore = useStore((state) => state.addActivity);
-  const { firestore } = useFirebase();
+  const { firestore, app } = useFirebase();
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
@@ -110,7 +110,7 @@ export function WeeklyPlanForm() {
   }, [watchStartTime, watchEndTime, form]);
 
   async function onSubmit(data: WeeklyPlanFormValues) {
-    if (!firestore || !user || !currentUserProfile?.district) {
+    if (!firestore || !user || !currentUserProfile?.district || !app) {
         toast({
             title: 'Error',
             description: 'Could not connect to the database or user district is not set. Please try again.',
@@ -121,7 +121,7 @@ export function WeeklyPlanForm() {
     
     setIsSubmitting(true);
     try {
-        await addActivityStore(firestore, user.uid, currentUserProfile.district, {
+        await addActivityStore(app, firestore, user.uid, currentUserProfile.district, {
             date: data.date.toISOString(),
             type: 'Weekly Plan',
             details: data,

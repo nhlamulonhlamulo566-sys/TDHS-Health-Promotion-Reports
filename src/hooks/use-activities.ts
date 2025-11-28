@@ -18,33 +18,25 @@ export function useActivities() {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
         const fetchUserProfile = async () => {
           if (user && firestore) {
             const userDocRef = doc(firestore, 'users', user.uid);
-            try {
-                const docSnap = await getDoc(userDocRef);
-                if (docSnap.exists()) {
-                  setUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
-                }
-            } catch (e) {
-                console.error("Error fetching user profile", e);
+            const docSnap = await getDoc(userDocRef);
+            if (isMounted && docSnap.exists()) {
+              setUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
             }
-          }
-           if (!user) {
-            setUserProfile(null);
           }
         };
         fetchUserProfile();
+        return () => {
+            isMounted = false;
+        };
     }, [user, firestore]);
 
     useEffect(() => {
-        if (!firestore || !user) {
-            setIsLoading(false);
-            setActivities([]); 
-            return;
-        }
-        
-        if (!userProfile) {
+        if (!firestore || !userProfile) {
+            if (!user) setIsLoading(false);
             return;
         }
 
@@ -60,6 +52,7 @@ export function useActivities() {
                     where('district', '==', userProfile.district)
                 );
             } else {
+                // Admin with no district sees nothing for now. Can be changed.
                 setActivities([]);
                 setIsLoading(false);
                 return;
@@ -78,7 +71,7 @@ export function useActivities() {
         }, (error) => {
             console.error("Error fetching activities:", error);
              const permissionError = new FirestorePermissionError({
-                path: 'activities', 
+                path: 'activities', // Use a general path as it could be filtered or not
                 operation: 'list',
             });
             errorEmitter.emit('permission-error', permissionError);
@@ -91,7 +84,7 @@ export function useActivities() {
         });
 
         return () => unsubscribe();
-    }, [firestore, user, userProfile, setActivities, toast]);
+    }, [firestore, userProfile, setActivities, toast, user?.uid]);
 
     return { activities, isLoading };
 }

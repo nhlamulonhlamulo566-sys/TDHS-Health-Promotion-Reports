@@ -91,7 +91,7 @@ const defaultValues: Partial<HealthTalkFormValues> = {
 export function HealthTalkForm() {
   const { toast } = useToast();
   const addActivity = useStore((state) => state.addActivity);
-  const { firestore } = useFirebase();
+  const { firestore, app } = useFirebase();
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
@@ -142,7 +142,7 @@ export function HealthTalkForm() {
   }, [watchStartTime, watchEndTime, form]);
 
   async function onSubmit(data: HealthTalkFormValues) {
-    if (!firestore || !user || !currentUserProfile?.district) {
+    if (!firestore || !user || !currentUserProfile?.district || !app) {
          toast({
             title: 'Error',
             description: 'Could not save. User profile or district not found.',
@@ -158,7 +158,7 @@ export function HealthTalkForm() {
           type: 'Health Talk',
           details: data,
         };
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
+        await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
         
         toast({
             title: "Health Talk Saved!",
@@ -433,4 +433,3 @@ export function HealthTalkForm() {
     </Card>
   );
 }
-    

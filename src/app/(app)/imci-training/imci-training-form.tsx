@@ -53,7 +53,7 @@ const trainingFormSchema = z.object({
     required_error: "A date is required.",
   }),
   venue: z.string().min(1, "Venue is required."),
-  peopleReached: z.coerce.number().min(0, "Please enter a valid number."),
+  peopleReached: z.coerce.number().min(1, "Please enter a valid number."),
   traineeType: z.string().min(1, "Trainee type is required."),
   otherTraineeType: z.string().optional(),
   notes: z.string().optional(),
@@ -97,13 +97,15 @@ const traineeTypes = [
   "Community",
   "Child Minders",
   "Students",
+  "Food Handlers",
+  "Security Officers",
   "Other",
 ];
 
 export function ImciTrainingForm() {
   const { toast } = useToast();
   const addActivity = useStore((state) => state.addActivity);
-  const { firestore } = useFirebase();
+  const { firestore, app } = useFirebase();
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
@@ -148,7 +150,7 @@ export function ImciTrainingForm() {
   }, [watchStartTime, watchEndTime, form]);
 
   async function onSubmit(data: TrainingFormValues) {
-    if (!firestore || !user || !currentUserProfile?.district) {
+    if (!firestore || !user || !currentUserProfile?.district || !app) {
       toast({
           title: 'Error',
           description: 'Could not save. User profile or district not found.',
@@ -164,7 +166,7 @@ export function ImciTrainingForm() {
           type: 'IMCI Training',
           details: data,
         };
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
+        await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
         toast({
         title: "IMCI Training Saved!",
         description: "The new IMCI training has been recorded.",
@@ -310,7 +312,7 @@ export function ImciTrainingForm() {
               name="peopleReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of People Reached</FormLabel>
+                  <FormLabel>Number of People Reached *</FormLabel>
                   <FormControl>
                     <div className="relative">
                         <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -405,5 +407,3 @@ export function ImciTrainingForm() {
     </Card>
   );
 }
-
-    

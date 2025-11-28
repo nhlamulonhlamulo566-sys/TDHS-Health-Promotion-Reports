@@ -139,7 +139,7 @@ function AddUserDialog({ onUserAdded, currentUserRole }) {
         <DialogHeader>
           <DialogTitle>Add New User</DialogTitle>
           <DialogDescription>
-            Create a new user account and assign them a role. They will receive an email to set up their password.
+            Create a new user account and profile in the system.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -352,6 +352,7 @@ export function UserManagementTab() {
         const { getAuth: getAuthInstance, createUserWithEmailAndPassword } = await import('firebase/auth');
         const { firebaseConfig } = await import('@/firebase/config');
 
+        // Create a temporary Firebase app instance to create the user
         const tempAppName = `temp-app-${Date.now()}`;
         const tempApp = initializeApp(firebaseConfig, tempAppName);
         const tempAuth = getAuthInstance(tempApp);
@@ -359,6 +360,7 @@ export function UserManagementTab() {
         const userCredential = await createUserWithEmailAndPassword(tempAuth, data.email, data.password);
         const newUser = userCredential.user;
 
+        // Now, use the main app's Firestore instance to create the user document
         if (newUser) {
             const userDocRef = doc(firestore, "users", newUser.uid);
             const userProfile = {
@@ -377,6 +379,7 @@ export function UserManagementTab() {
                 title: "User Created Successfully",
                 description: "The new user account and profile have been created.",
             });
+            // The temp app is not explicitly deleted, as Firebase handles app instances.
             return true;
         }
         return false;
@@ -388,13 +391,18 @@ export function UserManagementTab() {
                 type: 'manual',
                 message: 'This email is already in use by another account.'
             });
-        } else if (error.name === 'FirestorePermissionError') {
-             errorEmitter.emit('permission-error', error);
+        } else if (error.name === 'FirebaseError' && error.code.includes('permission-denied')) {
+             const permissionError = new FirestorePermissionError({
+                path: `users/${data.email}`,
+                operation: 'create',
+                requestResourceData: data,
+            }, error);
+            errorEmitter.emit('permission-error', permissionError);
         }
         else {
             toast({
                 title: "Error Creating User",
-                description: "An unexpected error occurred. Please try again.",
+                description: error.message || "An unexpected error occurred. Please try again.",
                 variant: "destructive"
             });
         }
@@ -422,7 +430,15 @@ export function UserManagementTab() {
     if (!firestore) return;
     const userDocRef = doc(firestore, "users", userId);
     
+    // Note: This only deletes the Firestore document, not the Firebase Auth user.
+    // Deleting auth users requires admin privileges, typically from a backend server.
     deleteDoc(userDocRef)
+        .then(() => {
+            toast({
+                title: "User Profile Deleted",
+                description: "The user's profile data has been removed from the database.",
+            });
+        })
         .catch(async (serverError) => {
             const permissionError = new FirestorePermissionError({
                 path: userDocRef.path,
@@ -492,27 +508,35 @@ export function UserManagementTab() {
       <Alert className="bg-blue-50 border-blue-200">
         <AlertDescription>
           <h3 className="font-semibold mb-2">Role Descriptions</h3>
-           <div className="flex items-start md:items-center gap-4 mb-1 flex-col md:flex-row">
-            <div className="flex items-center gap-2 w-44 shrink-0">
-                <Gem className="h-4 w-4 text-purple-500" />
-                <strong>Super Administrator:</strong>
+           <div className="flex flex-col gap-2">
+              <div className="flex items-start gap-2">
+                <div className="mt-1">
+                  <Gem className="h-4 w-4 text-purple-500 shrink-0" />
+                </div>
+                <div>
+                  <strong>Super Administrator:</strong>
+                  <span> Ultimate access, can manage all users including Administrators.</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="mt-1">
+                  <Crown className="h-4 w-4 text-amber-500 shrink-0" />
+                </div>
+                <div>
+                  <strong>Administrator:</strong>
+                  <span> Can manage users and create reports. Cannot manage other Admins.</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="mt-1">
+                  <ShieldCheck className="h-4 w-4 text-blue-500 shrink-0" />
+                </div>
+                <div>
+                  <strong>Health Promoter:</strong>
+                  <span> Can create and manage their own health reports.</span>
+                </div>
+              </div>
             </div>
-            <span>Ultimate access, can manage all users including Administrators.</span>
-          </div>
-          <div className="flex items-start md:items-center gap-4 mb-1 flex-col md:flex-row">
-            <div className="flex items-center gap-2 w-44 shrink-0">
-              <Crown className="h-4 w-4 text-amber-500" />
-              <strong>Administrator:</strong>
-            </div>
-            <span>Can manage users and create reports. Cannot manage other Admins.</span>
-          </div>
-          <div className="flex items-start md:items-center gap-4 flex-col md:flex-row">
-            <div className="flex items-center gap-2 w-44 shrink-0">
-              <ShieldCheck className="h-4 w-4 text-blue-500" />
-              <strong>Health Promoter:</strong>
-            </div>
-            <span>Can create and manage their own health reports.</span>
-          </div>
         </AlertDescription>
       </Alert>
 
@@ -641,7 +665,7 @@ export function UserManagementTab() {
                                     <AlertDialogHeader>
                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This will permanently delete the user profile for <span className="font-semibold">{user.displayName}</span> from the database. It will not delete their authentication account.
+                                        This will permanently delete the user profile for <span className="font-semibold">{user.displayName}</span> from the database. This action does not delete their authentication account.
                                     </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>

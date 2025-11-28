@@ -48,6 +48,17 @@ export function RecentCornerToCornerSessions() {
         return { ...activity, userName: user?.displayName, userDistrict: user?.district };
     })
     .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+  const getServicesDisplay = (session: any) => {
+    if (!session.details.services || session.details.services.length === 0) return "No services recorded";
+    
+    return session.details.services.map((s: any) => {
+        if (s.id === 'other') {
+            return `${session.details.otherTopic || 'Other'} (${s.peopleReached || 0})`;
+        }
+        return `${s.label} (${s.peopleReached || 0})`;
+    }).join(', ');
+  }
 
   return (
     <Card>
@@ -64,7 +75,7 @@ export function RecentCornerToCornerSessions() {
             {sessions.map((session) => (
                 <div key={session.id} className="flex items-start justify-between gap-4 rounded-lg p-4 hover:bg-secondary">
                     <div className="grid gap-1 flex-1">
-                      <p className="font-semibold">{session.details.topic === 'Other' ? session.details.otherTopic : session.details.topic}</p>
+                      <p className="font-semibold">{getServicesDisplay(session)}</p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <span>{session.details.venue}</span>
                       </div>

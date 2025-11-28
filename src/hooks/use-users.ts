@@ -19,33 +19,25 @@ export function useUsers() {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
      useEffect(() => {
+        let isMounted = true;
         const fetchUserProfile = async () => {
           if (user && firestore) {
             const userDocRef = doc(firestore, 'users', user.uid);
-            try {
-                const docSnap = await getDoc(userDocRef);
-                if (docSnap.exists()) {
-                  setUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
-                }
-            } catch (e) {
-                console.error("Error fetching user profile", e);
+            const docSnap = await getDoc(userDocRef);
+            if (isMounted && docSnap.exists()) {
+              setUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
             }
-          }
-          if (!user) {
-            setUserProfile(null);
           }
         };
         fetchUserProfile();
+        return () => {
+            isMounted = false;
+        };
     }, [user, firestore]);
 
     useEffect(() => {
-        if (!firestore || !user) {
-            setIsLoading(false);
-            setUsers([]);
-            return;
-        }
-
-        if (!userProfile) {
+        if (!firestore || !userProfile) {
+             if (!user) setIsLoading(false);
             return;
         }
 
@@ -61,9 +53,11 @@ export function useUsers() {
                     where('district', '==', userProfile.district)
                 );
             } else {
+                // Admin with no district sees only themself.
                 usersQuery = query(collection(firestore, 'users'), where('uid', '==', userProfile.id));
             }
         } else {
+            // Health promoters only see themselves
             usersQuery = query(collection(firestore, 'users'), where('uid', '==', userProfile.id));
         }
 
@@ -88,7 +82,7 @@ export function useUsers() {
         });
 
         return () => unsubscribe();
-    }, [firestore, user, userProfile, setUsers, toast]);
+    }, [firestore, userProfile, setUsers, toast, user?.uid]);
 
     return { users, isLoading };
 }

@@ -24,13 +24,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -43,20 +36,22 @@ import { useUsers } from "@/hooks/use-users";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const topics = [
-  "Importance of Physical Activity",
-  "Salt reduction",
-  "Nutrition",
-  "Obesity & Overweight",
-  "Tobacco, Alcohol & Substance Abuse",
-  "Safe Sexual Behaviour",
-  "bullying",
-  "Food Poisoning",
-  "Teenage Pregnancy",
-  "Human Traffic",
-  "Personal Hygiene",
-  "Children's Rights",
-  "Dental & Oral Care",
-  "Other",
+    { id: "physical-activity", label: "Importance of Physical Activity" },
+    { id: "salt-reduction", label: "Salt reduction" },
+    { id: "nutrition", label: "Nutrition" },
+    { id: "obesity-overweight", label: "Obesity & Overweight" },
+    { id: "substance-abuse", label: "Tobacco, Alcohol & Substance Abuse" },
+    { id: "sexual-behaviour", label: "Safe Sexual Behaviour" },
+    { id: "bullying", label: "bullying" },
+    { id: "food-poisoning", label: "Food Poisoning" },
+    { id: "teenage-pregnancy", label: "Teenage Pregnancy" },
+    { id: "human-traffic", label: "Human Traffic" },
+    { id: "personal-hygiene", label: "Personal Hygiene" },
+    { id: "childrens-rights", label: "Children's Rights" },
+    { id: "dental-oral-care", label: "Dental & Oral Care" },
+    { id: "mental-health", label: "Mental Health" },
+    { id: "gambling", label: "Gambling" },
+    { id: "other", label: "Other" },
 ];
 
 const gradeLevels = [
@@ -84,16 +79,18 @@ const schoolVisitFormSchema = z.object({
   gradeLevel: z.array(z.string()).refine((value) => value.some((item) => item), {
     message: "You have to select at least one grade level.",
   }),
-  topic: z.string().min(1, "You have to select at least one topic."),
+  topic: z.array(z.string()).refine((value) => value.length > 0, {
+    message: "You have to select at least one topic.",
+  }),
   otherTopic: z.string().optional(),
   studentsReached: z.coerce
     .number()
-    .min(0, "Number of students must be a positive number."),
+    .min(1, "Number of students must be a positive number."),
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
 }).refine(data => {
-    if (data.topic === 'Other' && (!data.otherTopic || data.otherTopic.trim() === '')) {
+    if (data.topic.includes('Other') && (!data.otherTopic || data.otherTopic.trim() === '')) {
         return false;
     }
     return true;
@@ -116,7 +113,7 @@ type SchoolVisitFormValues = z.infer<typeof schoolVisitFormSchema>;
 const defaultValues: Partial<SchoolVisitFormValues> = {
   schoolName: "",
   gradeLevel: [],
-  topic: "",
+  topic: [],
   otherTopic: "",
   studentsReached: 0,
   notes: "",
@@ -127,7 +124,7 @@ const defaultValues: Partial<SchoolVisitFormValues> = {
 export function SchoolVisitForm() {
   const { toast } = useToast();
   const addActivity = useStore((state) => state.addActivity);
-  const { firestore } = useFirebase();
+  const { firestore, app } = useFirebase();
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
@@ -139,7 +136,7 @@ export function SchoolVisitForm() {
   });
 
   const watchTopic = form.watch("topic");
-  const isOtherSelected = watchTopic === "Other";
+  const isOtherSelected = watchTopic?.includes("Other");
 
   const [duration, setDuration] = React.useState<string | null>(null);
   const watchStartTime = form.watch("startTime");
@@ -172,7 +169,7 @@ export function SchoolVisitForm() {
   }, [watchStartTime, watchEndTime, form]);
 
   async function onSubmit(data: SchoolVisitFormValues) {
-    if (!firestore || !user || !currentUserProfile?.district) {
+    if (!firestore || !user || !currentUserProfile?.district || !app) {
       toast({
           title: 'Error',
           description: 'Could not save. User profile or district not found.',
@@ -188,7 +185,7 @@ export function SchoolVisitForm() {
           type: 'School Visit',
           details: data,
         };
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
+        await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
 
         toast({
         title: "School Visit Saved!",
@@ -385,31 +382,54 @@ export function SchoolVisitForm() {
             <FormField
               control={form.control}
               name="topic"
-              render={({ field }) => (
+              render={() => (
                 <FormItem>
-                  <FormLabel>Topic Covered *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a topic" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {topics.map((topic) => (
-                        <SelectItem key={topic} value={topic}>
-                          {topic}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="mb-4">
+                    <FormLabel className="text-base">Topics Covered *</FormLabel>
+                    <FormDescription>
+                      Select all topics that apply.
+                    </FormDescription>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {topics.map((item) => (
+                    <FormField
+                      key={item.id}
+                      control={form.control}
+                      name="topic"
+                      render={({ field }) => {
+                        return (
+                          <FormItem
+                            key={item.id}
+                            className="flex flex-row items-start space-x-3 space-y-0"
+                          >
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(item.label)}
+                                onCheckedChange={(checked) => {
+                                  const currentSelection = field.value || [];
+                                  return checked
+                                    ? field.onChange([...currentSelection, item.label])
+                                    : field.onChange(
+                                        currentSelection?.filter(
+                                          (value) => value !== item.label
+                                        )
+                                      )
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              {item.label}
+                            </FormLabel>
+                          </FormItem>
+                        )
+                      }}
+                    />
+                  ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
             {isOtherSelected && (
               <FormField
                 control={form.control}
@@ -434,7 +454,7 @@ export function SchoolVisitForm() {
               name="studentsReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of Students Reached</FormLabel>
+                  <FormLabel>Number of Students Reached *</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -479,4 +499,3 @@ export function SchoolVisitForm() {
     </Card>
   );
 }
-    

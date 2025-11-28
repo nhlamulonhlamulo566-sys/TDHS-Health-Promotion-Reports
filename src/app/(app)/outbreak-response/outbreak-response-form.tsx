@@ -52,7 +52,7 @@ const outbreakResponseFormSchema = z.object({
   otherTopic: z.string().optional(),
   peopleReached: z.coerce
     .number()
-    .min(0, "Number of people must be a positive number."),
+    .min(1, "Number of people must be a positive number."),
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
@@ -129,7 +129,7 @@ const topics = [
 export function OutbreakResponseForm() {
   const { toast } = useToast();
   const addActivity = useStore((state) => state.addActivity);
-  const { firestore } = useFirebase();
+  const { firestore, app } = useFirebase();
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
@@ -177,7 +177,7 @@ export function OutbreakResponseForm() {
   }, [watchStartTime, watchEndTime, form]);
 
   async function onSubmit(data: OutbreakResponseFormValues) {
-    if (!firestore || !user || !currentUserProfile?.district) {
+    if (!firestore || !user || !currentUserProfile?.district || !app) {
       toast({
           title: 'Error',
           description: 'Could not save. User profile or district not found.',
@@ -193,7 +193,7 @@ export function OutbreakResponseForm() {
           type: 'Outbreak Response',
           details: data,
         };
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
+        await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
 
         toast({
         title: "Outbreak Response Saved!",
@@ -462,7 +462,7 @@ export function OutbreakResponseForm() {
               name="peopleReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of People Reached</FormLabel>
+                  <FormLabel>Number of People Reached *</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -507,5 +507,3 @@ export function OutbreakResponseForm() {
     </Card>
   );
 }
-
-    

@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -59,7 +60,7 @@ const campaignFormSchema = z.object({
   otherTargetGroup: z.string().optional(),
   venue: z.string().min(1, "Venue is required."),
   location: z.string().min(1, "Location is required."),
-  peopleReached: z.coerce.number().min(0, "Please enter a valid number."),
+  peopleReached: z.coerce.number().min(1, "Please enter a valid number."),
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
@@ -106,19 +107,19 @@ const defaultValues: Partial<CampaignFormValues> = {
 };
 
 const campaignTypes = [
-  "Pregnancy Awareness Week",
-  "STI/Condom Week",
-  "World TB Day",
-  "African Vaccination Week",
-  "World Malaria Day",
-  "Global Move For Health Day",
-  "World No Tobacco Day",
-  "World Breastfeeding Week",
-  "Women’s Health",
-  "Global Hand-washing Day",
-  "World Diabetes Day",
-  "World Aids Day",
-  "Other",
+    "Pregnancy Awareness Week",
+    "STI/Condom Week",
+    "World TB Day",
+    "African Vaccination Week",
+    "World Malaria Day",
+    "Global Move for Health Day",
+    "World No Tobacco Day",
+    "World Breastfeeding Week",
+    "Women's Health",
+    "Global Hand-washing Day",
+    "World Diabetes Day",
+    "World AIDS Day",
+    "Other"
 ];
 
 const targetGroups = [
@@ -128,13 +129,14 @@ const targetGroups = [
     "Children",
     "Non-school going youth",
     "Community in general",
+    "LGBTQIA+",
     "Other",
 ];
 
 export function CampaignForm() {
   const { toast } = useToast();
   const addActivity = useStore((state) => state.addActivity);
-  const { firestore } = useFirebase();
+  const { firestore, app } = useFirebase();
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
@@ -182,7 +184,7 @@ export function CampaignForm() {
   }, [watchStartTime, watchEndTime, form]);
 
   async function onSubmit(data: CampaignFormValues) {
-    if (!firestore || !user || !currentUserProfile?.district) {
+    if (!firestore || !user || !currentUserProfile?.district || !app) {
       toast({
           title: 'Error',
           description: 'Could not save. User profile or district not found.',
@@ -198,7 +200,7 @@ export function CampaignForm() {
           type: 'Health Campaign',
           details: data,
         };
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
+        await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
 
         toast({
         title: "Campaign Saved!",
@@ -460,7 +462,7 @@ export function CampaignForm() {
               name="peopleReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of People Reached</FormLabel>
+                  <FormLabel>Number of People Reached *</FormLabel>
                   <FormControl>
                     <div className="relative">
                         <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -508,4 +510,3 @@ export function CampaignForm() {
     </Card>
   );
 }
-    

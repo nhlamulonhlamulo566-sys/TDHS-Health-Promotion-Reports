@@ -22,6 +22,16 @@ import { useFirestore, useUser } from '@/firebase';
 import { useActivities } from '@/hooks/use-activities';
 import { useUsers } from '@/hooks/use-users';
 
+const getTopicDisplay = (details: any) => {
+    const { topic, otherTopic } = details;
+    if (!topic) return 'No topics';
+    if (Array.isArray(topic)) {
+        const displayTopics = topic.map(t => (t === 'Other' && otherTopic ? otherTopic : t));
+        return displayTopics.join(', ');
+    }
+    return topic === 'Other' && otherTopic ? otherTopic : topic;
+}
+
 export function RecentCrecheVisits() {
   const { toast } = useToast();
   const { activities, isLoading } = useActivities();
@@ -64,7 +74,7 @@ export function RecentCrecheVisits() {
             {visits.map((visit) => (
                 <div key={visit.id} className="flex items-start justify-between gap-4 rounded-lg p-4 hover:bg-secondary">
                     <div className="grid gap-1 flex-1">
-                      <p className="font-semibold">{visit.details.topic === 'Other' ? visit.details.otherTopic : visit.details.topic}</p>
+                      <p className="font-semibold">{getTopicDisplay(visit.details)}</p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <span>{visit.details.crecheName}</span>
                       </div>

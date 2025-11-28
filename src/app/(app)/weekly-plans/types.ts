@@ -1,2 +1,6 @@
-
-// This file is no longer used and can be deleted. Types are now centralized in src/lib/types.ts
+export type Activity = {
+  id: string;
+  date: Date;
+  activity: string;
+  venue: string;
+};

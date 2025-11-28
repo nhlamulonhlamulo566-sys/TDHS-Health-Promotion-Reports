@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download, Activity, Users, TrendingUp, Clock } from "lucide-react";
 import { format } from "date-fns";
-import { UserProfile, Attachment } from "@/lib/store";
+import { UserProfile } from "@/lib/store";
 
 interface ReportSummaryProps {
   data: {
@@ -22,7 +22,6 @@ interface ReportSummaryProps {
     },
     breakdown: { [key: string]: number },
     activities: any[], // Full activities data
-    attachments: Attachment[], // Full attachments data
     config: {
         reportType: string;
         date: { from: Date, to: Date };
@@ -57,8 +56,19 @@ const activityLabels = {
     tish: 'TISH',
     cornerToCorner: 'Corner to Corner',
     supportGroups: 'Support Group',
-    attachments: 'Attachment',
+    documentUploads: 'Document Upload',
+    healthSpecialProjects: 'Health Special Project',
 };
+
+const topicLabels = {
+    "physical-activity": "Importance of Physical Activity",
+    "salt-reduction": "Salt reduction",
+    "nutrition": "Nutrition",
+    "obesity-overweight": "Obesity & Overweight",
+    "substance-abuse": "Tobacco, Alcohol & Substance Abuse",
+    "sexual-behaviour": "Safe Sexual Behaviour",
+    "other": "Other",
+  };
 
 const escapeCsvCell = (cellData: any) => {
     if (cellData === null || cellData === undefined) {
@@ -72,48 +82,81 @@ const escapeCsvCell = (cellData: any) => {
 };
 
 export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSummaryProps) {
-  const { summary, breakdown, config, activities, attachments, users } = data;
+  const { summary, breakdown, config, activities, users } = data;
     
   const handleDownload = () => {
-    const activityKeysToDownload = (selectedActivitiesForDownload.length > 0 
+    const activityTypesToDownload = (selectedActivitiesForDownload.length > 0 
         ? selectedActivitiesForDownload 
-        : Object.keys(breakdown).filter(key => key !== 'attachments')
-    );
-    
-    const activityTypesToDownload = activityKeysToDownload.map(key => activityLabels[key]).filter(Boolean);
+        : Object.keys(breakdown)
+    ).map(key => activityLabels[key]);
     
     const detailedActivities = activities.filter(activity => activityTypesToDownload.includes(activity.type));
 
     const headers = [
-        "Activity ID", "Activity Type",
-        "User Name",
-        "District", "Date", "Start Time", "End Time",
-        "Venue", "Location", "People Reached", "Topic", "Notes",
+        "Activity ID", "Activity Type", "User Name", "District", "Date", "Start Time", "End Time",
+        // Universal-ish fields
+        "Venue", "Location", "People Reached", "Topic", "Other Topic", "Notes", "NB",
         // Campaign specific
-        "Campaign Type", "Target Group",
+        "Campaign Type", "Other Campaign Type", "Target Group", "Other Target Group",
         // Creche specific
-        "Creche Name", "Age Group", "Children Minders Reached", "Children Reached",
+        "Creche Name", "Age Group", "Children Minders Reached", "Parents Reached", "Children Reached",
         // IMCI specific
-        "Trainee Type",
+        "Trainee Type", "Other Trainee Type",
         // Outbreak specific
-        "Disease Type", "Severity Level",
+        "Disease Type", "Other Disease Type", "Severity Level",
         // School specific
         "School Name", "Grade Level", "Students Reached",
         // Social Mob specific
-        "Mobilization Method",
+        "Mobilization Method", "Other Mobilization Method",
         // Support Group specific
-        "Support Group Type", "Physical Activity",
-        // Attachment specific (now separate)
+        "Support Group Type", "Other Support Group Type", "Physical Activity", "Other Physical Activity",
+        // TISH / Corner to Corner specific
+        "Services",
+        // Document Upload specific
+        "Document Title",
+        // Health Special Project specific
+        "Project Name", "Project Description",
+        // Attachments
+        "Register Attachment URL", "Picture Attachment URL",
     ];
 
-    const attachmentHeaders = [
-        "Attachment ID", "User Name", "District", "Date", "Title", "Notes", 
-        "Register Attachment URL", "Picture Attachment URLs"
-    ]
-
-    const activityRows = detailedActivities.map(activity => {
+    const rows = detailedActivities.map(activity => {
         const user = users.find(u => u.id === activity.userId);
         const details = activity.details || {};
+
+        let topicDisplay = details.topic;
+        if (Array.isArray(details.topic)) {
+          topicDisplay = details.topic.map(t => (t === 'Other' || t ==='other') && details.otherTopic ? details.otherTopic : t).join(', ');
+        } else if (details.topic === 'Other' || details.topic === 'other') {
+          topicDisplay = details.otherTopic;
+        } else if (activity.type === 'Health Talk' && details.topics) {
+            topicDisplay = details.topics.map(t => t === 'other' ? details.otherTopic : (topicLabels[t] || t)).join(', ');
+        }
+
+        let servicesDisplay = "";
+        if (details.services && Array.isArray(details.services)) {
+            servicesDisplay = details.services.map(s => {
+                if (s.id === 'other') {
+                    return `${details.otherTopic || 'Other'} (${s.peopleReached || 0})`;
+                }
+                return `${s.label} (${s.peopleReached || 0})`;
+            }).join('; ');
+        }
+        
+        let campaignTypeDisplay = details.campaignType;
+        if (Array.isArray(details.campaignType)) {
+             campaignTypeDisplay = details.campaignType.map(t => t === 'Other' && details.otherCampaignType ? details.otherCampaignType : t).join(', ');
+        } else if (details.campaignType === 'Other') {
+            campaignTypeDisplay = details.otherCampaignType;
+        }
+
+        let mobilizationMethodDisplay = details.mobilizationMethod;
+        if (Array.isArray(details.mobilizationMethod)) {
+            mobilizationMethodDisplay = details.mobilizationMethod.map(m => m === 'Other' && details.otherMobilizationMethod ? details.otherMobilizationMethod : m).join(', ');
+        } else if (details.mobilizationMethod === 'Other') {
+            mobilizationMethodDisplay = details.otherMobilizationMethod;
+        }
+        
         const rowData = {
             "Activity ID": activity.id,
             "Activity Type": activity.type,
@@ -124,47 +167,45 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
             "End Time": details.endTime,
             "Venue": details.venue,
             "Location": details.location,
-            "People Reached": details.peopleReached,
-            "Topic": details.topic === 'Other' ? details.otherTopic : details.topic,
+            "People Reached": details.peopleReached || details.studentsReached || details.childrenReached,
+            "Topic": topicDisplay,
+            "Other Topic": details.otherTopic,
             "Notes": details.notes,
-            "Campaign Type": details.campaignType === 'Other' ? details.otherCampaignType : details.campaignType,
+            "NB": details.nb,
+            "Campaign Type": campaignTypeDisplay,
+            "Other Campaign Type": details.otherCampaignType,
             "Target Group": details.targetGroup === 'Other' ? details.otherTargetGroup : details.targetGroup,
+            "Other Target Group": details.otherTargetGroup,
             "Creche Name": details.crecheName,
             "Age Group": details.ageGroup,
             "Children Minders Reached": details.childrenMindersReached,
+            "Parents Reached": details.parentsReached,
             "Children Reached": details.childrenReached,
             "Trainee Type": details.traineeType === 'Other' ? details.otherTraineeType : details.traineeType,
+            "Other Trainee Type": details.otherTraineeType,
             "Disease Type": details.diseaseType === 'Other' ? details.otherDiseaseType : details.diseaseType,
+            "Other Disease Type": details.otherDiseaseType,
             "Severity Level": details.severityLevel,
             "School Name": details.schoolName,
-            "Grade Level": details.gradeLevel,
+            "Grade Level": Array.isArray(details.gradeLevel) ? details.gradeLevel.join(', ') : details.gradeLevel,
             "Students Reached": details.studentsReached,
-            "Mobilization Method": details.mobilizationMethod === 'Other' ? details.otherMobilizationMethod : details.mobilizationMethod,
+            "Mobilization Method": mobilizationMethodDisplay,
+            "Other Mobilization Method": details.otherMobilizationMethod,
             "Support Group Type": details.supportGroupType === 'Other' ? details.otherSupportGroupType : details.supportGroupType,
+            "Other Support Group Type": details.otherSupportGroupType,
             "Physical Activity": details.physicalActivity === 'Other' ? details.otherPhysicalActivity : details.physicalActivity,
+            "Other Physical Activity": details.otherPhysicalActivity,
+            "Services": servicesDisplay,
+            "Document Title": details.title,
+            "Project Name": details.projectName,
+            "Project Description": details.description,
+            "Register Attachment URL": details.registerAttachment,
+            "Picture Attachment URL": details.pictureAttachment,
         };
         return headers.map(header => escapeCsvCell(rowData[header])).join(',');
     });
 
-    let csvContent = [headers.join(','), ...activityRows].join('\n');
-
-    if (selectedActivitiesForDownload.includes('attachments')) {
-        const attachmentRows = attachments.map(attachment => {
-            const user = users.find(u => u.id === attachment.userId);
-            return [
-                escapeCsvCell(attachment.id),
-                escapeCsvCell(user?.displayName),
-                escapeCsvCell(attachment.district),
-                escapeCsvCell(format(new Date(attachment.date), 'yyyy-MM-dd')),
-                escapeCsvCell(attachment.title),
-                escapeCsvCell(attachment.notes),
-                escapeCsvCell(attachment.registerAttachmentUrl),
-                escapeCsvCell(Array.isArray(attachment.pictureAttachmentUrls) ? attachment.pictureAttachmentUrls.join(', ') : ''),
-            ].join(',');
-        });
-        csvContent += '\n\n' + [attachmentHeaders.join(','), ...attachmentRows].join('\n');
-    }
-
+    const csvContent = [headers.join(','), ...rows].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

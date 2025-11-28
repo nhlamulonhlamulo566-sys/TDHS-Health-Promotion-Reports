@@ -22,8 +22,9 @@ import {
 } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUsers } from "@/hooks/use-users";
+import { UserProfile } from "@/lib/store";
 
 interface ReportConfigurationFormProps {
   onGenerateReport: (config: any) => void;
@@ -68,6 +69,15 @@ export function ReportConfigurationForm({
     onGenerateReport({ reportType, date, selectedUser });
   };
 
+  const usersByDistrict = users.reduce((acc, user) => {
+    const district = user.district || 'Uncategorized';
+    if (!acc[district]) {
+      acc[district] = [];
+    }
+    acc[district].push(user);
+    return acc;
+  }, {} as Record<string, UserProfile[]>);
+
   return (
     <Card>
       <CardHeader>
@@ -79,7 +89,7 @@ export function ReportConfigurationForm({
             <Label className="mb-2 block">Report Type</Label>
             <RadioGroup
               defaultValue="monthly"
-              className="grid grid-cols-1 md:grid-cols-3 gap-4"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-4"
               onValueChange={setReportType}
               value={reportType}
             >
@@ -117,7 +127,7 @@ export function ReportConfigurationForm({
             </RadioGroup>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <Label>User</Label>
                 <Select value={selectedUser} onValueChange={setSelectedUser}>
@@ -129,8 +139,13 @@ export function ReportConfigurationForm({
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Users</SelectItem>
-                        {users.map(user => (
-                            <SelectItem key={user.id} value={user.id}>{user.displayName}</SelectItem>
+                        {Object.entries(usersByDistrict).map(([district, districtUsers]) => (
+                            <SelectGroup key={district}>
+                                <SelectLabel>{district}</SelectLabel>
+                                {districtUsers.map(user => (
+                                    <SelectItem key={user.id} value={user.id}>{user.displayName}</SelectItem>
+                                ))}
+                            </SelectGroup>
                         ))}
                     </SelectContent>
                 </Select>

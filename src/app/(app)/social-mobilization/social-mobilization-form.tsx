@@ -24,6 +24,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,6 +48,7 @@ import useStore from "@/lib/store";
 import { useFirebase, useUser } from "@/firebase";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useUsers } from "@/hooks/use-users";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const topics = [
     "Health Education",
@@ -65,18 +67,22 @@ const campaignFormSchema = z.object({
     required_error: "A date is required.",
   }),
   location: z.string().min(1, "Location is required."),
-  campaignType: z.string().min(1, "Campaign type is required."),
+  campaignType: z.array(z.string()).refine((value) => value.some((item) => item), {
+    message: "You have to select at least one campaign type.",
+  }),
   otherCampaignType: z.string().optional(),
-  mobilizationMethod: z.string().min(1, "Mobilization method is required."),
+  mobilizationMethod: z.array(z.string()).refine((value) => value.some((item) => item), {
+    message: "You have to select at least one mobilization method.",
+  }),
   otherMobilizationMethod: z.string().optional(),
   topic: z.string().min(1, "You have to select at least one topic."),
   otherTopic: z.string().optional(),
-  peopleReached: z.coerce.number().min(0, "Please enter a valid number."),
+  peopleReached: z.coerce.number().min(1, "Please enter a valid number."),
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
 }).refine(data => {
-    if (data.campaignType === 'Other' && (!data.otherCampaignType || data.otherCampaignType.trim() === '')) {
+    if (data.campaignType.includes('Other') && (!data.otherCampaignType || data.otherCampaignType.trim() === '')) {
         return false;
     }
     return true;
@@ -84,7 +90,7 @@ const campaignFormSchema = z.object({
     message: "Please specify the 'Other' campaign type.",
     path: ["otherCampaignType"],
 }).refine(data => {
-    if (data.mobilizationMethod === 'Other' && (!data.otherMobilizationMethod || data.otherMobilizationMethod.trim() === '')) {
+    if (data.mobilizationMethod.includes('Other') && (!data.otherMobilizationMethod || data.otherMobilizationMethod.trim() === '')) {
         return false;
     }
     return true;
@@ -115,9 +121,9 @@ type CampaignFormValues = z.infer<typeof campaignFormSchema>;
 
 const defaultValues: Partial<CampaignFormValues> = {
   location: "",
-  campaignType: "",
+  campaignType: [],
   otherCampaignType: "",
-  mobilizationMethod: "",
+  mobilizationMethod: [],
   otherMobilizationMethod: "",
   topic: "",
   otherTopic: "",
@@ -128,25 +134,37 @@ const defaultValues: Partial<CampaignFormValues> = {
 };
 
 const campaignTypes = [
-  "Community Meetings",
-  "Door-to-door visits",
-  "Public Announcements",
-  "Partnerships with local leaders",
-  "Other",
+    { id: "pregnancy-awareness-week", label: "Pregnancy Awareness Week" },
+    { id: "sti-condom-week", label: "STI/Condom Week" },
+    { id: "world-tb-day", label: "World TB Day" },
+    { id: "african-vaccination-week", label: "African Vaccination Week" },
+    { id: "world-malaria-day", label: "World Malaria Day" },
+    { id: "global-move-for-health-day", label: "Global Move for Health Day" },
+    { id: "world-no-tobacco-day", label: "World No Tobacco Day" },
+    { id: "world-breastfeeding-week", label: "World Breastfeeding Week" },
+    { id: "womens-health", label: "Women's Health" },
+    { id: "global-hand-washing-day", label: "Global Hand-washing Day" },
+    { id: "world-diabetes-day", label: "World Diabetes Day" },
+    { id: "world-aids-day", label: "World AIDS Day" },
+    { id: "tish", label: "TISH" },
+    { id: "corner-to-corner", label: "Corner to Corner" },
+    { id: "other", label: "Other" },
 ];
 
 const mobilizationMethods = [
-    "Community meetings",
-    "Home visits",
-    "Public announcements (radio, posters)",
-    "Using local media (newspapers, TV)",
-    "Other",
+    { id: "community-meetings", label: "Community meetings" },
+    { id: "home-visits", label: "Home visits" },
+    { id: "public-announcements", label: "Public announcements (radio, posters)" },
+    { id: "local-media", label: "Using local media (newspapers, TV)" },
+    { id: "loud-hailing", label: "Loud Hailing" },
+    { id: "social-media", label: "Social Media" },
+    { id: "other", label: "Other" },
 ];
 
 export function SocialMobilizationForm() {
   const { toast } = useToast();
   const addActivity = useStore((state) => state.addActivity);
-  const { firestore } = useFirebase();
+  const { firestore, app } = useFirebase();
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
@@ -158,10 +176,10 @@ export function SocialMobilizationForm() {
   });
 
   const watchCampaignType = form.watch("campaignType");
-  const isOtherCampaignTypeSelected = watchCampaignType === "Other";
+  const isOtherCampaignTypeSelected = watchCampaignType?.includes("Other");
 
   const watchMobilizationMethod = form.watch("mobilizationMethod");
-  const isOtherMobilizationMethodSelected = watchMobilizationMethod === "Other";
+  const isOtherMobilizationMethodSelected = watchMobilizationMethod?.includes("Other");
 
   const watchTopic = form.watch("topic");
   const isOtherTopicSelected = watchTopic === "Other";
@@ -197,7 +215,7 @@ export function SocialMobilizationForm() {
   }, [watchStartTime, watchEndTime, form]);
 
   async function onSubmit(data: CampaignFormValues) {
-    if (!firestore || !user || !currentUserProfile?.district) {
+    if (!firestore || !user || !currentUserProfile?.district || !app) {
       toast({
           title: 'Error',
           description: 'Could not save. User profile or district not found.',
@@ -213,7 +231,7 @@ export function SocialMobilizationForm() {
           type: 'Social Mobilization',
           details: data,
         };
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
+        await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
 
         toast({
         title: "Mobilization Campaign Saved!",
@@ -358,26 +376,49 @@ export function SocialMobilizationForm() {
             <FormField
               control={form.control}
               name="campaignType"
-              render={({ field }) => (
+              render={() => (
                 <FormItem>
-                  <FormLabel>Campaign Type *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select campaign type..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {campaignTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="mb-4">
+                    <FormLabel className="text-base">Campaign Type *</FormLabel>
+                    <FormDescription>
+                      Select all campaign types that apply.
+                    </FormDescription>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {campaignTypes.map((item) => (
+                    <FormField
+                      key={item.id}
+                      control={form.control}
+                      name="campaignType"
+                      render={({ field }) => {
+                        return (
+                          <FormItem
+                            key={item.id}
+                            className="flex flex-row items-start space-x-3 space-y-0"
+                          >
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(item.label)}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...(field.value || []), item.label])
+                                    : field.onChange(
+                                        field.value?.filter(
+                                          (value) => value !== item.label
+                                        )
+                                      )
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              {item.label}
+                            </FormLabel>
+                          </FormItem>
+                        )
+                      }}
+                    />
+                  ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -404,26 +445,49 @@ export function SocialMobilizationForm() {
             <FormField
               control={form.control}
               name="mobilizationMethod"
-              render={({ field }) => (
+              render={() => (
                 <FormItem>
-                  <FormLabel>Mobilization Method *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select method..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {mobilizationMethods.map((method) => (
-                        <SelectItem key={method} value={method}>
-                          {method}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="mb-4">
+                    <FormLabel className="text-base">Mobilization Method *</FormLabel>
+                    <FormDescription>
+                      Select all mobilization methods that apply.
+                    </FormDescription>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {mobilizationMethods.map((item) => (
+                    <FormField
+                      key={item.id}
+                      control={form.control}
+                      name="mobilizationMethod"
+                      render={({ field }) => {
+                        return (
+                          <FormItem
+                            key={item.id}
+                            className="flex flex-row items-start space-x-3 space-y-0"
+                          >
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(item.label)}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...(field.value || []), item.label])
+                                    : field.onChange(
+                                        field.value?.filter(
+                                          (value) => value !== item.label
+                                        )
+                                      )
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              {item.label}
+                            </FormLabel>
+                          </FormItem>
+                        )
+                      }}
+                    />
+                  ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -495,7 +559,7 @@ export function SocialMobilizationForm() {
               name="peopleReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of People Reached</FormLabel>
+                  <FormLabel>Number of People Reached *</FormLabel>
                   <FormControl>
                     <div className="relative">
                         <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

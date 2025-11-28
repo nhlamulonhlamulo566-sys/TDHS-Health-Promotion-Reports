@@ -3,16 +3,26 @@
 
 import { useEffect } from 'react';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { useToast } from '@/hooks/use-toast';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * A client component that listens for 'permission-error' events and throws them.
- * This is designed to be caught by the Next.js development error overlay.
+ * A client component that listens for 'permission-error' events and displays a toast notification.
  */
 export function FirebaseErrorListener() {
+  const { toast } = useToast();
+
   useEffect(() => {
     const handleError = (error: Error) => {
-      // Throw the error so Next.js can catch it and display the overlay
-      throw error;
+      if (error instanceof FirestorePermissionError) {
+        console.error(error); // Log the detailed error for developers
+        toast({
+          title: "Permission Denied",
+          description: "You do not have permission to perform this action. Contact your administrator if you believe this is an error.",
+          variant: "destructive",
+          duration: 10000,
+        });
+      }
     };
 
     errorEmitter.on('permission-error', handleError);
@@ -20,7 +30,7 @@ export function FirebaseErrorListener() {
     return () => {
       errorEmitter.off('permission-error', handleError);
     };
-  }, []);
+  }, [toast]);
 
   return null; // This component does not render anything
 }

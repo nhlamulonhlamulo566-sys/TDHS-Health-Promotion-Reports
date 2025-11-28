@@ -7,6 +7,7 @@ import {
   Baby,
   CalendarDays,
   FileText,
+  HeartHandshake,
   HeartPulse,
   Home,
   LayoutDashboard,
@@ -46,8 +47,7 @@ import { useUsers } from '@/hooks/use-users';
 import { UserProfile } from '@/lib/store';
 import { Skeleton } from '@/components/ui/skeleton';
 import ChunkErrorBoundary from '../chunk-error-handler';
-import { useIdleTimeout } from '@/hooks/use-idle-timeout';
-import { useToast } from '@/hooks/use-toast';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 const menuItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -62,7 +62,8 @@ const menuItems = [
   { href: '/support-groups', label: 'Support Groups', icon: Users },
   { href: '/corner-to-corner', label: 'Corner to Corner', icon: Home },
   { href: '/tish', label: 'TISH', icon: Home },
-  { href: '/attachments', label: 'Attachments', icon: Paperclip },
+  { href: '/health-special-project', label: 'Health Special Project', icon: HeartHandshake },
+  { href: '/document-upload', label: 'Document Upload', icon: Paperclip },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/user-management', label: 'Settings', icon: Settings },
 ];
@@ -156,7 +157,7 @@ function LayoutWithSidebar({ children, userProfile, onLogout }) {
                 {/* Can add a global search here in the future */}
                 </div>
             </header>
-            <main className="flex-1 p-4 sm:p-6"><ChunkErrorBoundary>{children}</ChunkErrorBoundary></main>
+            <main className="flex-1 p-4 sm:p-6"><ChunkErrorBoundary><FirebaseErrorListener/>{children}</ChunkErrorBoundary></main>
             </SidebarInset>
         </>
     );
@@ -179,27 +180,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const firestore = useFirestore();
   const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = React.useState(true);
-  const { toast } = useToast();
   
   // Initialize data fetching hooks. They will manage their own loading state.
   useActivities();
   useUsers();
-  
-  const handleLogout = React.useCallback(async (isIdle = false) => {
-    if(auth) {
-        await signOut(auth);
-        if (isIdle) {
-            toast({
-                title: "You have been signed out",
-                description: "You were signed out due to inactivity.",
-            });
-        }
-    }
-    router.push('/login');
-  }, [auth, signOut, router, toast]);
-
-  // Auto-logout after 5 minutes of inactivity.
-  useIdleTimeout(() => handleLogout(true), 5 * 60 * 1000);
   
   React.useEffect(() => {
     if (!authLoading && !user) {
@@ -208,34 +192,55 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [user, authLoading, router]);
   
   React.useEffect(() => {
+    let isMounted = true;
     const fetchUserProfile = async () => {
+      if (!isMounted) return;
       setProfileLoading(true);
       if (user && firestore) {
         const userDocRef = doc(firestore, 'users', user.uid);
         try {
             const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) {
-              setUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
-            } else {
-                setUserProfile({
-                    id: user.uid,
-                    displayName: user.displayName || 'New User',
-                    email: user.email || '',
-                    role: 'User'
-                });
+            if (isMounted) {
+                if (docSnap.exists()) {
+                    setUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
+                } else {
+                    setUserProfile({
+                        id: user.uid,
+                        displayName: user.displayName || 'New User',
+                        email: user.email || '',
+                        role: 'User'
+                    });
+                }
             }
         } catch (error) {
             console.error("Error fetching user profile:", error);
             // Handle error, maybe show a toast
         } finally {
-            setProfileLoading(false);
+            if (isMounted) {
+                setProfileLoading(false);
+            }
         }
       } else if (!user) {
-          setProfileLoading(false);
+          if (isMounted) {
+              setProfileLoading(false);
+          }
       }
     };
     fetchUserProfile();
+
+    return () => {
+        isMounted = false;
+    };
   }, [user, firestore]);
+
+  const handleLogout = async () => {
+    // First, navigate to the login page.
+    router.push('/login');
+    // Then, sign the user out.
+    if(auth) {
+        await signOut(auth);
+    }
+  };
 
   if (authLoading || profileLoading) {
      return (
@@ -253,7 +258,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <InnerLayout userProfile={userProfile} onLogout={() => handleLogout(false)}>
+    <InnerLayout userProfile={userProfile} onLogout={handleLogout}>
       {children}
     </InnerLayout>
   );

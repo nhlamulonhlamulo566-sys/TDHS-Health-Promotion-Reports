@@ -28,49 +28,72 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import useStore from "@/lib/store";
 import { useFirebase, useUser } from "@/firebase";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useUsers } from "@/hooks/use-users";
 
 const topics = [
-  "TB Testing",
-  "TB Screening",
-  "Family Planning",
-  "Pap Smear",
-  "Eye Care",
-  "Physical Activity",
-  "HIV Testing",
-  "HIV Screening",
-  "Cervical Cancer Screening",
-  "Oral Health",
-  "Hearing Test",
-  "De-worming",
-  "Other",
+  { id: "tb-screening", label: "TB Screening" },
+  { id: "bp-screening", label: "BP Screening" },
+  { id: "hiv-testing", label: "HIV Testing" },
+  { id: "family-planning", label: "Family Planning" },
+  { id: "eye-care", label: "Eye Care" },
+  { id: "nutrition", label: "Nutrition" },
+  { id: "bg-screening", label: "BG Screening" },
+  { id: "flu-vaccine", label: "Flu Vaccine" },
+  { id: "prep", label: "PrEP" },
+  { id: "cervical-cancer-screening", label: "Cervical Cancer Screening" },
+  { id: "vitamin-a", label: "Vitamin A" },
+  { id: "deworming", label: "Deworming" },
+  { id: "mental-health", label: "Mental Health" },
+  { id: "dental-care", label: "Dental Care" },
+  { id: "pamphlets-distributed", label: "Pamphlets Distributed" },
+  { id: "condoms-distributed", label: "Condoms Distributed" },
+  { id: "pap-smear", label: "Pap Smear" },
+  { id: "mmc", label: "MMC" },
+  { id: "muac", label: "MUAC" },
+  { id: "other", label: "Other" },
 ];
+
+const serviceSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  peopleReached: z.coerce.number().optional(),
+});
 
 const serviceSessionFormSchema = z.object({
   date: z.date({
     required_error: "A date for the session is required.",
   }),
   venue: z.string().min(1, "Venue is required."),
-  peopleReached: z.coerce
-    .number()
-    .min(0, "Number of people must be a positive number."),
-  topic: z.string().min(1, "You have to select at least one topic."),
+  services: z.array(serviceSchema).refine((value) => value.length > 0, {
+    message: "You have to select at least one service.",
+  }),
   otherTopic: z.string().optional(),
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
 }).refine(data => {
-    if (data.topic === 'Other' && (!data.otherTopic || data.otherTopic.trim() === '')) {
+    const otherService = data.services.find(s => s.id === 'other');
+    if (otherService && (!data.otherTopic || data.otherTopic.trim() === '')) {
         return false;
     }
     return true;
 }, {
-    message: "Please specify the 'Other' topic.",
+    message: "Please specify the 'Other' service.",
     path: ["otherTopic"],
+}).refine(data => {
+    for (const service of data.services) {
+        if (!service.peopleReached || service.peopleReached < 1) {
+            return false;
+        }
+    }
+    return true;
+}, {
+    message: "People reached is required for every selected service.",
+    path: ["services"],
 }).refine(data => {
     const [startHour, startMinute] = data.startTime.split(':').map(Number);
     const [endHour, endMinute] = data.endTime.split(':').map(Number);
@@ -86,8 +109,7 @@ type ServiceSessionFormValues = z.infer<typeof serviceSessionFormSchema>;
 
 const defaultValues: Partial<ServiceSessionFormValues> = {
   venue: "",
-  peopleReached: 0,
-  topic: "",
+  services: [],
   otherTopic: "",
   notes: "",
   startTime: "",
@@ -97,7 +119,7 @@ const defaultValues: Partial<ServiceSessionFormValues> = {
 export function TishForm() {
   const { toast } = useToast();
   const addActivity = useStore((state) => state.addActivity);
-  const { firestore } = useFirebase();
+  const { firestore, app } = useFirebase();
   const { user } = useUser();
   const { users } = useUsers();
   const currentUserProfile = users.find(u => u.id === user?.uid);
@@ -108,8 +130,8 @@ export function TishForm() {
     defaultValues,
   });
 
-  const watchTopic = form.watch("topic");
-  const isOtherSelected = watchTopic === "Other";
+  const watchServices = form.watch("services");
+  const isOtherSelected = watchServices?.some(s => s.id === "other");
 
   const [duration, setDuration] = React.useState<string | null>(null);
   const watchStartTime = form.watch("startTime");
@@ -142,7 +164,7 @@ export function TishForm() {
   }, [watchStartTime, watchEndTime, form]);
 
   async function onSubmit(data: ServiceSessionFormValues) {
-    if (!firestore || !user || !currentUserProfile?.district) {
+    if (!firestore || !user || !currentUserProfile?.district || !app) {
       toast({
           title: 'Error',
           description: 'Could not save. User profile or district not found.',
@@ -153,12 +175,13 @@ export function TishForm() {
     
     setIsSubmitting(true);
     try {
+        const totalPeopleReached = data.services.reduce((acc, service) => acc + (service.peopleReached || 0), 0);
         const activityData = {
           date: data.date.toISOString(),
           type: 'TISH',
-          details: data,
+          details: { ...data, peopleReached: totalPeopleReached },
         };
-        await addActivity(firestore, user.uid, currentUserProfile.district, activityData);
+        await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
 
         toast({
         title: "Service Session Saved!",
@@ -302,64 +325,66 @@ export function TishForm() {
             
             <FormField
               control={form.control}
-              name="peopleReached"
+              name="services"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of People Reached</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        className="pl-9"
-                        {...field}
-                      />
-                    </div>
-                  </FormControl>
+                  <FormLabel>Service Rendered *</FormLabel>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {topics.map((topic) => (
+                      <div key={topic.id} className="flex items-center gap-4 rounded-md border p-4">
+                        <Checkbox
+                          id={`service-${topic.id}`}
+                          checked={field.value?.some(s => s.id === topic.id)}
+                          onCheckedChange={(checked) => {
+                            const currentServices = field.value || [];
+                            if (checked) {
+                              field.onChange([...currentServices, { id: topic.id, label: topic.label, peopleReached: 1 }]);
+                            } else {
+                              field.onChange(currentServices.filter(s => s.id !== topic.id));
+                            }
+                          }}
+                        />
+                        <label htmlFor={`service-${topic.id}`} className="flex-1 text-sm font-medium leading-none">
+                          {topic.label}
+                        </label>
+                        {field.value?.some(s => s.id === topic.id) && (
+                           <div className="relative w-24">
+                             <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                             <Input
+                                type="number"
+                                placeholder="0"
+                                className="pl-9"
+                                min={1}
+                                value={field.value.find(s => s.id === topic.id)?.peopleReached || ''}
+                                onChange={(e) => {
+                                   const updatedServices = field.value.map(s => 
+                                    s.id === topic.id 
+                                    ? { ...s, peopleReached: parseInt(e.target.value) || 0 }
+                                    : s
+                                   );
+                                   field.onChange(updatedServices);
+                                }}
+                             />
+                           </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
             
-            <FormField
-              control={form.control}
-              name="topic"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Topic Covered *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a topic" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {topics.map((topic) => (
-                        <SelectItem key={topic} value={topic}>
-                          {topic}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             {isOtherSelected && (
               <FormField
                 control={form.control}
                 name="otherTopic"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Please specify other topic</FormLabel>
+                    <FormLabel>Please specify other service *</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Enter other topic..."
+                        placeholder="Enter other service..."
                         {...field}
                       />
                     </FormControl>
@@ -397,5 +422,3 @@ export function TishForm() {
     </Card>
   );
 }
-
-    

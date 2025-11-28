@@ -74,22 +74,66 @@
       },
       "required": ["id", "userId", "date", "type", "details", "createdAt"]
     },
-    "Attachment": {
-        "title": "Attachment",
+    "DocumentUpload": {
+        "title": "Document Upload",
         "type": "object",
-        "description": "Represents an uploaded file attachment.",
+        "description": "Represents an uploaded document or photo.",
         "properties": {
-            "id": { "type": "string", "description": "Unique identifier for the attachment." },
-            "userId": { "type": "string", "description": "The ID of the user who uploaded it." },
-            "district": { "type": "string", "description": "The district the user belongs to." },
-            "date": { "type": "string", "format": "date-time" },
-            "title": { "type": "string" },
-            "notes": { "type": "string" },
-            "registerAttachmentUrl": { "type": "string", "format": "uri" },
-            "pictureAttachmentUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
-            "createdAt": { "type": "string", "format": "date-time" }
+            "title": {
+                "type": "string",
+                "description": "Title of the document."
+            },
+            "notes": {
+                "type": "string",
+                "description": "Additional notes for the document."
+            },
+            "registerAttachment": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL to the uploaded register file."
+            },
+            "pictureAttachment": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL to the uploaded picture file."
+            }
         },
-        "required": ["id", "userId", "date", "title", "createdAt"]
+        "required": ["title"]
+    },
+    "HealthSpecialProject": {
+      "title": "Health Special Project",
+      "type": "object",
+      "description": "Represents a health special project activity.",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "projectName": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "peopleReached": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "time"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "time"
+        }
+      },
+      "required": ["date", "projectName", "location", "description", "peopleReached", "startTime", "endTime"]
     }
   },
   "auth": {
@@ -110,12 +154,6 @@
         "$ref": "#/entities/Activity"
       },
       "description": "Stores all user activities."
-    },
-    "/attachments/{attachmentId}": {
-        "schema": {
-            "$ref": "#/entities/Attachment"
-        },
-        "description": "Stores all user file attachments."
     }
   }
 }
