@@ -53,27 +53,43 @@ const topics = [
   { id: "other", label: "Other" },
 ];
 
+const topicSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  peopleReached: z.coerce.number().optional(),
+});
+
 const healthTalkFormSchema = z.object({
   date: z.date({
     required_error: "A date is required.",
   }),
   venue: z.string().min(1, "Venue is required."),
-  topics: z.array(z.string()).refine((value) => value.some((item) => item), {
+  topics: z.array(topicSchema).refine((value) => value.length > 0, {
     message: "You have to select at least one topic.",
   }),
   otherTopic: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
-  peopleReached: z.coerce.number().min(1, "Please enter a number."),
   notes: z.string().optional(),
 }).refine(data => {
-    if (data.topics.includes('other') && (!data.otherTopic || data.otherTopic.trim() === '')) {
+    const otherTopic = data.topics.find(s => s.id === 'other');
+    if (otherTopic && (!data.otherTopic || data.otherTopic.trim() === '')) {
         return false;
     }
     return true;
 }, {
     message: "Please specify the 'Other' topic.",
     path: ["otherTopic"],
+}).refine(data => {
+    for (const topic of data.topics) {
+        if (!topic.peopleReached || topic.peopleReached < 1) {
+            return false;
+        }
+    }
+    return true;
+}, {
+    message: "People reached is required for every selected topic.",
+    path: ["topics"],
 });
 
 type HealthTalkFormValues = z.infer<typeof healthTalkFormSchema>;
@@ -82,7 +98,6 @@ const defaultValues: Partial<HealthTalkFormValues> = {
   venue: "",
   topics: [],
   otherTopic: "",
-  peopleReached: 0,
   notes: "",
   startTime: "",
   endTime: "",
@@ -107,7 +122,7 @@ export function HealthTalkForm() {
   const watchStartTime = form.watch("startTime");
   const watchEndTime = form.watch("endTime");
   const watchTopics = form.watch("topics");
-  const isOtherSelected = watchTopics?.includes("other");
+  const isOtherSelected = watchTopics?.some(s => s.id === 'other');
 
   React.useEffect(() => {
     if (watchStartTime && watchEndTime) {
@@ -153,10 +168,11 @@ export function HealthTalkForm() {
     
     setIsSubmitting(true);
     try {
+        const totalPeopleReached = data.topics.reduce((acc, topic) => acc + (topic.peopleReached || 0), 0);
         const activityData = {
           date: data.date.toISOString(),
           type: 'Health Talk',
-          details: data,
+          details: { ...data, peopleReached: totalPeopleReached },
         };
         await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
         
@@ -302,47 +318,53 @@ export function HealthTalkForm() {
             <FormField
               control={form.control}
               name="topics"
-              render={() => (
+              render={({ field }) => (
                 <FormItem>
                   <div className="mb-4">
                     <FormLabel className="text-base">Topics Covered *</FormLabel>
                     <FormDescription>
-                      Select all topics that apply.
+                      Select all topics that apply and enter the number of people reached for each.
                     </FormDescription>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {topics.map((item) => (
-                    <FormField
-                      key={item.id}
-                      control={form.control}
-                      name="topics"
-                      render={({ field }) => {
-                        return (
-                          <FormItem
-                            key={item.id}
-                            className="flex flex-row items-start space-x-3 space-y-0"
-                          >
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(item.id)}
-                                onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([...(field.value || []), item.id])
-                                    : field.onChange(
-                                        field.value?.filter(
-                                          (value) => value !== item.id
-                                        )
-                                      )
+                  {topics.map((topic) => (
+                    <div key={topic.id} className="flex items-center gap-4 rounded-md border p-4">
+                        <Checkbox
+                          id={`topic-${topic.id}`}
+                          checked={field.value?.some(t => t.id === topic.id)}
+                          onCheckedChange={(checked) => {
+                            const currentTopics = field.value || [];
+                            if (checked) {
+                              field.onChange([...currentTopics, { id: topic.id, label: topic.label, peopleReached: 1 }]);
+                            } else {
+                              field.onChange(currentTopics.filter(t => t.id !== topic.id));
+                            }
+                          }}
+                        />
+                        <label htmlFor={`topic-${topic.id}`} className="flex-1 text-sm font-medium leading-none">
+                          {topic.label}
+                        </label>
+                        {field.value?.some(t => t.id === topic.id) && (
+                           <div className="relative w-24">
+                             <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                             <Input
+                                type="number"
+                                placeholder="0"
+                                className="pl-9"
+                                min={1}
+                                value={field.value.find(t => t.id === topic.id)?.peopleReached || ''}
+                                onChange={(e) => {
+                                   const updatedTopics = field.value.map(t => 
+                                    t.id === topic.id 
+                                    ? { ...t, peopleReached: parseInt(e.target.value) || 0 }
+                                    : t
+                                   );
+                                   field.onChange(updatedTopics);
                                 }}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              {item.label}
-                            </FormLabel>
-                          </FormItem>
-                        )
-                      }}
-                    />
+                             />
+                           </div>
+                        )}
+                      </div>
                   ))}
                   </div>
                   <FormMessage />
@@ -367,31 +389,6 @@ export function HealthTalkForm() {
                 )}
               />
             )}
-
-            <FormField
-              control={form.control}
-              name="peopleReached"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>People Reached *</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                        <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                        type="number"
-                        placeholder="0"
-                        className="pl-9"
-                        {...field}
-                        onChange={(e) =>
-                            field.onChange(parseInt(e.target.value, 10) || 0)
-                        }
-                        />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}

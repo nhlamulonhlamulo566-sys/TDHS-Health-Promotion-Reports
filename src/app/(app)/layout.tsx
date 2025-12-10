@@ -14,7 +14,6 @@ import {
   LogOut,
   Megaphone,
   Mic,
-  Paperclip,
   School,
   Settings,
   Siren,
@@ -63,7 +62,6 @@ const menuItems = [
   { href: '/corner-to-corner', label: 'Corner to Corner', icon: Home },
   { href: '/tish', label: 'TISH', icon: Home },
   { href: '/health-special-project', label: 'Health Special Project', icon: HeartHandshake },
-  { href: '/document-upload', label: 'Document Upload', icon: Paperclip },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/user-management', label: 'Settings', icon: Settings },
 ];

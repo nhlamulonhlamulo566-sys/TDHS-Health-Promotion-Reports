@@ -71,6 +71,12 @@ const gradeLevels = [
   { id: "All Grades", label: "All Grades" },
 ];
 
+const topicSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  studentsReached: z.coerce.number().optional(),
+});
+
 const schoolVisitFormSchema = z.object({
   date: z.date({
     required_error: "A date for the visit is required.",
@@ -79,24 +85,32 @@ const schoolVisitFormSchema = z.object({
   gradeLevel: z.array(z.string()).refine((value) => value.some((item) => item), {
     message: "You have to select at least one grade level.",
   }),
-  topic: z.array(z.string()).refine((value) => value.length > 0, {
+  topics: z.array(topicSchema).refine((value) => value.length > 0, {
     message: "You have to select at least one topic.",
   }),
   otherTopic: z.string().optional(),
-  studentsReached: z.coerce
-    .number()
-    .min(1, "Number of students must be a positive number."),
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
 }).refine(data => {
-    if (data.topic.includes('Other') && (!data.otherTopic || data.otherTopic.trim() === '')) {
+    const otherTopic = data.topics.find(t => t.id === 'other');
+    if (otherTopic && (!data.otherTopic || data.otherTopic.trim() === '')) {
         return false;
     }
     return true;
 }, {
     message: "Please specify the 'Other' topic.",
     path: ["otherTopic"],
+}).refine(data => {
+    for (const topic of data.topics) {
+        if (!topic.studentsReached || topic.studentsReached < 1) {
+            return false;
+        }
+    }
+    return true;
+}, {
+    message: "Students reached is required for every selected topic.",
+    path: ["topics"],
 }).refine(data => {
     const [startHour, startMinute] = data.startTime.split(':').map(Number);
     const [endHour, endMinute] = data.endTime.split(':').map(Number);
@@ -113,9 +127,8 @@ type SchoolVisitFormValues = z.infer<typeof schoolVisitFormSchema>;
 const defaultValues: Partial<SchoolVisitFormValues> = {
   schoolName: "",
   gradeLevel: [],
-  topic: [],
+  topics: [],
   otherTopic: "",
-  studentsReached: 0,
   notes: "",
   startTime: "",
   endTime: "",
@@ -135,8 +148,8 @@ export function SchoolVisitForm() {
     defaultValues,
   });
 
-  const watchTopic = form.watch("topic");
-  const isOtherSelected = watchTopic?.includes("Other");
+  const watchTopics = form.watch("topics");
+  const isOtherSelected = watchTopics?.some(t => t.id === "other");
 
   const [duration, setDuration] = React.useState<string | null>(null);
   const watchStartTime = form.watch("startTime");
@@ -180,10 +193,11 @@ export function SchoolVisitForm() {
 
     setIsSubmitting(true);
     try {
+        const totalStudentsReached = data.topics.reduce((acc, topic) => acc + (topic.studentsReached || 0), 0);
         const activityData = {
           date: data.date.toISOString(),
           type: 'School Visit',
-          details: data,
+          details: { ...data, studentsReached: totalStudentsReached },
         };
         await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
 
@@ -381,49 +395,54 @@ export function SchoolVisitForm() {
 
             <FormField
               control={form.control}
-              name="topic"
-              render={() => (
+              name="topics"
+              render={({ field }) => (
                 <FormItem>
                   <div className="mb-4">
                     <FormLabel className="text-base">Topics Covered *</FormLabel>
                     <FormDescription>
-                      Select all topics that apply.
+                      Select all topics that apply and enter the number of students reached for each.
                     </FormDescription>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {topics.map((item) => (
-                    <FormField
-                      key={item.id}
-                      control={form.control}
-                      name="topic"
-                      render={({ field }) => {
-                        return (
-                          <FormItem
-                            key={item.id}
-                            className="flex flex-row items-start space-x-3 space-y-0"
-                          >
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(item.label)}
-                                onCheckedChange={(checked) => {
-                                  const currentSelection = field.value || [];
-                                  return checked
-                                    ? field.onChange([...currentSelection, item.label])
-                                    : field.onChange(
-                                        currentSelection?.filter(
-                                          (value) => value !== item.label
-                                        )
-                                      )
+                  {topics.map((topic) => (
+                    <div key={topic.id} className="flex items-center gap-4 rounded-md border p-4">
+                        <Checkbox
+                          id={`topic-${topic.id}`}
+                          checked={field.value?.some(t => t.id === topic.id)}
+                          onCheckedChange={(checked) => {
+                            const currentTopics = field.value || [];
+                            if (checked) {
+                              field.onChange([...currentTopics, { id: topic.id, label: topic.label, studentsReached: 1 }]);
+                            } else {
+                              field.onChange(currentTopics.filter(t => t.id !== topic.id));
+                            }
+                          }}
+                        />
+                        <label htmlFor={`topic-${topic.id}`} className="flex-1 text-sm font-medium leading-none">
+                          {topic.label}
+                        </label>
+                        {field.value?.some(t => t.id === topic.id) && (
+                           <div className="relative w-24">
+                             <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                             <Input
+                                type="number"
+                                placeholder="0"
+                                className="pl-9"
+                                min={1}
+                                value={field.value.find(t => t.id === topic.id)?.studentsReached || ''}
+                                onChange={(e) => {
+                                   const updatedTopics = field.value.map(t => 
+                                    t.id === topic.id 
+                                    ? { ...t, studentsReached: parseInt(e.target.value) || 0 }
+                                    : t
+                                   );
+                                   field.onChange(updatedTopics);
                                 }}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              {item.label}
-                            </FormLabel>
-                          </FormItem>
-                        )
-                      }}
-                    />
+                             />
+                           </div>
+                        )}
+                      </div>
                   ))}
                   </div>
                   <FormMessage />
@@ -448,28 +467,6 @@ export function SchoolVisitForm() {
                 )}
               />
             )}
-
-            <FormField
-              control={form.control}
-              name="studentsReached"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Number of Students Reached *</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        className="pl-9"
-                        {...field}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}
@@ -499,3 +496,5 @@ export function SchoolVisitForm() {
     </Card>
   );
 }
+
+    

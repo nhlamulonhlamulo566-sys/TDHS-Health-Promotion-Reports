@@ -2,6 +2,7 @@
 import { PageHeader } from "@/components/page-header";
 import { SocialMobilizationForm } from "./social-mobilization-form";
 import { RecentMobilizations } from "./recent-mobilizations";
+import { Separator } from "@/components/ui/separator";
 
 export default function SocialMobilizationPage() {
   return (
@@ -10,14 +11,9 @@ export default function SocialMobilizationPage() {
         title="Social Mobilisation"
         description="Track community mobilization and advocacy activities"
       />
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-            <SocialMobilizationForm />
-        </div>
-        <div className="lg:col-span-1">
-            <RecentMobilizations />
-        </div>
-      </div>
+      <SocialMobilizationForm />
+      <Separator />
+      <RecentMobilizations />
     </div>
   );
 }

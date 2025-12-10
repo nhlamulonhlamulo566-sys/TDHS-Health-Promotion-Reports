@@ -74,32 +74,6 @@
       },
       "required": ["id", "userId", "date", "type", "details", "createdAt"]
     },
-    "DocumentUpload": {
-        "title": "Document Upload",
-        "type": "object",
-        "description": "Represents an uploaded document or photo.",
-        "properties": {
-            "title": {
-                "type": "string",
-                "description": "Title of the document."
-            },
-            "notes": {
-                "type": "string",
-                "description": "Additional notes for the document."
-            },
-            "registerAttachment": {
-                "type": "string",
-                "format": "uri",
-                "description": "URL to the uploaded register file."
-            },
-            "pictureAttachment": {
-                "type": "string",
-                "format": "uri",
-                "description": "URL to the uploaded picture file."
-            }
-        },
-        "required": ["title"]
-    },
     "HealthSpecialProject": {
       "title": "Health Special Project",
       "type": "object",

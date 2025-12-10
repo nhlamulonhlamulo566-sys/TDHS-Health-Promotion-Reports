@@ -1,7 +1,7 @@
 
 'use client';
 
-import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "firebase/storage";
 import { FirebaseApp } from "firebase/app";
 
 // This utility function is designed to separate file inputs from the rest of
@@ -38,15 +38,42 @@ export async function prepareActivityData(data: any, type: string) {
 }
 
 
-export async function uploadFile(app: FirebaseApp, file: File, activityId: string): Promise<string> {
+export async function uploadFile(app: FirebaseApp, file: File, activityId: string, onProgress?: (progress: number) => void): Promise<string> {
     if (!app) {
         throw new Error("Firebase app not initialized");
     }
 
     const storage = getStorage(app);
     const storageRef = ref(storage, `activities/${activityId}/${file.name}`);
-    
-    await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(storageRef);
-    return downloadURL;
+
+    return await new Promise<string>((resolve, reject) => {
+        try {
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on(
+                'state_changed',
+                (snapshot) => {
+                    const pct = snapshot.totalBytes > 0 ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+                    try {
+                        onProgress?.(pct);
+                    } catch (e) {
+                        console.warn('onProgress handler failed', e);
+                    }
+                },
+                (error) => {
+                    reject(error);
+                },
+                async () => {
+                    try {
+                        const downloadURL = await getDownloadURL(storageRef);
+                        resolve(downloadURL);
+                    } catch (err) {
+                        reject(err);
+                    }
+                }
+            );
+        } catch (err) {
+            reject(err);
+        }
+    });
 }

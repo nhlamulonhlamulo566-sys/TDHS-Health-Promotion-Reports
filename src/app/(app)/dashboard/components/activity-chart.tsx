@@ -12,8 +12,8 @@ export default function ActivityChart({ chartData }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Activities This Week</CardTitle>
-        <CardDescription>A summary of outreach and reporting activities.</CardDescription>
+        <CardTitle>Activities This Month</CardTitle>
+        <CardDescription>A summary of outreach and reporting activities for the current month.</CardDescription>
       </CardHeader>
       <CardContent className="pl-2">
         <ChartContainer config={chartConfig} className="min-h-[350px] w-full">
@@ -46,7 +46,7 @@ export default function ActivityChart({ chartData }) {
                 </BarChart>
             ) : (
                 <div className="flex h-[350px] w-full items-center justify-center">
-                    <p className="text-muted-foreground">No activities recorded this week...</p>
+                    <p className="text-muted-foreground">No activities recorded this month...</p>
                 </div>
             )}
         </ChartContainer>

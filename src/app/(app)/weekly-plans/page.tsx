@@ -3,6 +3,7 @@
 import { PageHeader } from '@/components/page-header';
 import { WeeklyPlanForm } from './weekly-plan-form';
 import { PlannedActivities } from './planned-activities';
+import { Separator } from '@/components/ui/separator';
 
 export default function WeeklyPlansPage() {
 
@@ -12,10 +13,9 @@ export default function WeeklyPlansPage() {
         title="Weekly Plan"
         description="Plan and schedule your weekly health activities"
       />
-      <div className="grid gap-8 lg:grid-cols-2">
-        <WeeklyPlanForm />
-        <PlannedActivities />
-      </div>
+      <WeeklyPlanForm />
+      <Separator />
+      <PlannedActivities />
     </div>
   );
 }

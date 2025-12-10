@@ -7,12 +7,11 @@ import {
   collection,
   serverTimestamp,
   type Firestore,
-  updateDoc,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { uploadFile } from './activity-utils';
 import { FirebaseApp } from 'firebase/app';
+import type { AttachmentDoc, UploadProgress } from './types';
 
 export interface Activity {
   id: string;
@@ -36,10 +35,16 @@ export interface UserProfile {
 interface StoreState {
   activities: Activity[];
   users: UserProfile[];
+  attachments: AttachmentDoc[];
   setActivities: (activities: Activity[]) => void;
   setUsers: (users: UserProfile[]) => void;
+  setAttachments: (attachments: AttachmentDoc[]) => void;
   addActivity: (app: FirebaseApp, db: Firestore, userId: string, district: string, activity: Omit<Activity, 'id' | 'userId' | 'createdAt' | 'district'>) => Promise<void>;
-  addDocumentUpload: (app: FirebaseApp, db: Firestore, userId: string, district: string, attachmentData: { date: Date; title: string; notes?: string; }, uploadTasks: { registerFile?: File | null; pictureFile?: File | null; }) => Promise<void>;
+  // Attachments
+  addAttachment: (db: Firestore, app: FirebaseApp, userId: string, district: string, attachmentData: { date: Date; title: string; notes?: string; }, uploadTasks: { registerFile?: File | null; pictureFiles?: File[] | null; }) => Promise<void>;
+  deleteAttachment: (db: Firestore, id: string) => void;
+  isUploading: boolean;
+  uploadProgress: UploadProgress;
   deleteActivity: (db: Firestore, id: string) => void;
 }
 
@@ -47,8 +52,12 @@ const useStore = create<StoreState>()(
     (set) => ({
       activities: [],
       users: [],
+      attachments: [],
       setActivities: (activities) => set({ activities }),
       setUsers: (users) => set({ users }),
+      setAttachments: (attachments) => set({ attachments }),
+      isUploading: false,
+      uploadProgress: {},
       addActivity: async (app, db, userId, district, activity) => {
         if (!userId) {
             console.error("User is not authenticated.");
@@ -74,67 +83,15 @@ const useStore = create<StoreState>()(
             throw permissionError;
         }
       },
-      addDocumentUpload: async (app, db, userId, district, attachmentData, uploadTasks) => {
-        if (!userId) {
-            console.error("User is not authenticated.");
-            throw new Error("User is not authenticated.");
-        };
-
-        const newActivity = {
-          date: attachmentData.date.toISOString(),
-          type: 'Document Upload',
-          details: {
-            title: attachmentData.title,
-            notes: attachmentData.notes,
-            registerAttachment: null,
-            pictureAttachment: null,
-          },
-          userId,
-          district,
-          createdAt: serverTimestamp(),
-        };
-
-        let docRef;
-        try {
-            docRef = await addDoc(collection(db, 'activities'), newActivity);
-            
-            const uploadPromises = [];
-            let updatePayload: { [key: string]: any } = {};
-
-            if (uploadTasks?.registerFile) {
-                uploadPromises.push(
-                    uploadFile(app, uploadTasks.registerFile, docRef.id).then(url => {
-                        updatePayload['details.registerAttachment'] = url;
-                    })
-                );
-            }
-            if (uploadTasks?.pictureFile) {
-                 uploadPromises.push(
-                    uploadFile(app, uploadTasks.pictureFile, docRef.id).then(url => {
-                        updatePayload['details.pictureAttachment'] = url;
-                    })
-                );
-            }
-            
-            if(uploadPromises.length > 0) {
-                await Promise.all(uploadPromises);
-                if (Object.keys(updatePayload).length > 0) {
-                    await updateDoc(docRef, updatePayload);
-                }
-            }
-
-
-        } catch (serverError: any) {
-             const isCreateOp = !docRef;
-             const permissionError = new FirestorePermissionError({
-                path: isCreateOp ? 'activities' : `activities/${docRef?.id}`,
-                operation: isCreateOp ? "create" : "update",
-                requestResourceData: newActivity,
-            }, serverError);
-            errorEmitter.emit('permission-error', permissionError);
-            // Re-throw the error so the UI can handle it (e.g., stop loading state)
-            throw permissionError;
-        }
+      addAttachment: async (db, app, userId, district, attachmentData, uploadTasks) => {
+        // This function is now a no-op since Document Upload is removed.
+        // Kept to avoid breaking references if any exist, but does nothing.
+        console.warn('addAttachment is deprecated and no longer functions.');
+        return Promise.resolve();
+      },
+      deleteAttachment: (db, id) => {
+        // This function is now a no-op since Document Upload is removed.
+        console.warn('deleteAttachment is deprecated and no longer functions.');
       },
       deleteActivity: (db, id) => {
         const activityRef = doc(db, 'activities', id);

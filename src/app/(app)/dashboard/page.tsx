@@ -4,24 +4,39 @@ import { useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { StatsCardsContainer } from "./components/stats-cards";
 import ActivityChart from "./components/activity-chart";
-import RecentReports from "./components/recent-reports";
+import MonthlyTopics from "./components/monthly-topics";
 import { useActivities } from "@/hooks/use-activities";
-import { addDays, startOfWeek, format } from 'date-fns';
+import { startOfMonth, endOfMonth, eachDayOfInterval, format } from 'date-fns';
 import { Skeleton } from "@/components/ui/skeleton";
+
+const topicLabelMap: { [key: string]: string } = {
+    "Importance of Physical Activity": "Physical Activity",
+    "Tobacco, Alcohol & Substance Abuse": "Substance Abuse",
+};
 
 export default function DashboardPage() {
   const { activities, isLoading } = useActivities();
 
   const dashboardData = useMemo(() => {
     if (isLoading || !activities) {
-        return { stats: null, chartData: null, recentActivities: null };
+        return { stats: null, chartData: null, topicsData: null };
     }
 
-    const weeklyPlans = activities.filter(a => a.type === 'Weekly Plan').length;
-    const healthTalks = activities.filter(a => a.type === 'Health Talk').length;
-    const reportsFiled = activities.length;
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
 
-    const peopleReached = activities.reduce((acc, a) => {
+    const monthlyActivities = activities.filter(a => {
+        if (!a.date) return false;
+        const activityDate = new Date(a.date);
+        return activityDate >= monthStart && activityDate <= monthEnd;
+    });
+
+    const weeklyPlans = monthlyActivities.filter(a => a.type === 'Weekly Plan').length;
+    const healthTalksCount = monthlyActivities.filter(a => a.type === 'Health Talk').length;
+    const reportsFiled = monthlyActivities.length;
+
+    const peopleReached = monthlyActivities.reduce((acc, a) => {
         if (!a.details) return acc;
         const count = a.details.peopleReached || a.details.childrenReached || a.details.studentsReached || 0;
         return acc + Number(count);
@@ -29,34 +44,58 @@ export default function DashboardPage() {
 
 
     const stats = [
-        { title: "Weekly Plans", value: weeklyPlans.toString(), icon: 'CalendarDays', change: "", color: "border-blue-500" },
-        { title: "People Reached", value: peopleReached.toLocaleString(), icon: 'Users', change: "Across all activities", color: "border-green-500" },
-        { title: "Health Talks", value: healthTalks.toString(), icon: 'Mic', change: "", color: "border-orange-500" },
-        { title: "Reports Filed", value: reportsFiled.toString(), icon: 'FileText', change: "All activity types", color: "border-purple-500" },
+        { title: "Weekly Plans", value: weeklyPlans.toString(), icon: 'CalendarDays', change: "This month", color: "border-blue-500" },
+        { title: "People Reached", value: peopleReached.toLocaleString(), icon: 'Users', change: "This month", color: "border-green-500" },
+        { title: "Health Talks", value: healthTalksCount.toString(), icon: 'Mic', change: "This month", color: "border-orange-500" },
+        { title: "Reports Filed", value: reportsFiled.toString(), icon: 'FileText', change: "This month", color: "border-purple-500" },
     ];
 
-    const weekStartsOn = 1; // Monday
-    const weekStart = startOfWeek(new Date(), { weekStartsOn });
-    const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
+    const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-    const chartData = days.map(day => {
+    const chartData = daysInMonth.map(day => {
         const dayString = format(day, 'yyyy-MM-dd');
-        const total = activities.filter(a => {
+        const total = monthlyActivities.filter(a => {
             if (!a.date) return false;
             return format(new Date(a.date), 'yyyy-MM-dd') === dayString;
         }).length;
         return {
-            name: format(day, 'E'), // Mon, Tue, etc.
+            name: format(day, 'd'), // Day of the month
             total: total
         };
     });
 
-    const recentActivities = activities
-        .filter(a => a.date)
-        .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 5);
+    const monthlyHealthTalks = monthlyActivities.filter(a => a.type === 'Health Talk');
 
-    return { stats, chartData, recentActivities };
+    const topicsSummary: { [key: string]: number } = monthlyHealthTalks.reduce((acc, talk) => {
+        if (talk.details && Array.isArray(talk.details.topics)) {
+            talk.details.topics.forEach((topic: { id: string; label: string; peopleReached: number }) => {
+                const reached = topic.peopleReached || 0;
+
+                if (topic.id === 'other') {
+                    if (!acc['Other']) {
+                        acc['Other'] = 0;
+                    }
+                    acc['Other'] += reached;
+                } else {
+                    const topicLabel = topic.label;
+                    if (!acc[topicLabel]) {
+                        acc[topicLabel] = 0;
+                    }
+                    acc[topicLabel] += reached;
+                }
+            });
+        }
+        return acc;
+    }, {} as { [key: string]: number });
+
+    const topicsData = Object.entries(topicsSummary)
+      .map(([topic, count]) => ({
+          topic: topicLabelMap[topic] || topic, // Use shortcut if available
+          count
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return { stats, chartData, topicsData };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activities?.length, isLoading]);
 
@@ -64,7 +103,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <PageHeader
         title="Welcome Back!"
-        description="Here's a summary of your health reporting activities."
+        description="Here's a summary of your health reporting activities for this month."
       />
       {isLoading || !dashboardData.stats ? (
         <>
@@ -91,7 +130,7 @@ export default function DashboardPage() {
                 <ActivityChart chartData={dashboardData.chartData} />
                 </div>
                 <div className="lg:col-span-2">
-                <RecentReports recentActivities={dashboardData.recentActivities} />
+                <MonthlyTopics topicsData={dashboardData.topicsData} />
                 </div>
             </div>
         </>

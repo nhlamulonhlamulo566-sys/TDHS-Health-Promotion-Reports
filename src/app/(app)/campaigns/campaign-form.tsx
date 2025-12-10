@@ -119,6 +119,15 @@ const campaignTypes = [
     "Global Hand-washing Day",
     "World Diabetes Day",
     "World AIDS Day",
+    "National Nutrition week",
+    "World Mental Health",
+    "World Heart Day",
+    "World Contraception Day",
+    "Cervical Cancer Awareness month",
+    "World Salt Awareness Week",
+    "Healthy Lifestyle Awareness Day",
+    "World Cancer Day",
+    "Men’s Health",
     "Other"
 ];
 

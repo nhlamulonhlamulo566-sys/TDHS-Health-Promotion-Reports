@@ -1,17 +1,21 @@
+
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Upload, X, File, Image as ImageIcon } from "lucide-react";
+import { Upload, X, File as FileIcon, Image as ImageIcon } from "lucide-react";
 import React, { useRef, useState } from "react";
 import { Button } from "./button";
 import { Input } from "./input";
 
 interface FileUploadProps {
-  onFileSelect: (file: File | null) => void;
+  onFileSelect: (file: File | File[] | FileList | null) => void;
   accept?: string;
   icon?: "image" | "file";
   title?: string;
   subtitle?: string;
+  multiple?: boolean;
+  // Optional externally controlled value; when `null` the component will clear its selection
+  value?: File | File[] | null;
 }
 
 export function FileUpload({
@@ -19,13 +23,37 @@ export function FileUpload({
   accept,
   icon = "file",
   title = "Click to upload a file",
-  subtitle = "Any file type"
+  subtitle = "Any file type",
+  multiple = false,
+  value,
 }: FileUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // If parent form resets the field value to null, clear our internal selected file and input value
+  React.useEffect(() => {
+    if (value == null) {
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } else if(typeof window !== 'undefined' && value instanceof File) {
+      setSelectedFile(value);
+    }
+  }, [value]);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files ? event.target.files[0] : null;
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      setSelectedFile(null);
+      onFileSelect(null);
+      return;
+    }
+    if ((event.target as HTMLInputElement).multiple) {
+      const arr = Array.from(files);
+      setSelectedFile(arr[0]);
+      onFileSelect(arr);
+      return;
+    }
+    const file = files[0];
     setSelectedFile(file);
     onFileSelect(file);
   };
@@ -49,6 +77,7 @@ export function FileUpload({
         onChange={handleFileChange}
         className="hidden"
         accept={accept}
+        multiple={multiple}
       />
       <div
         className={cn(
@@ -59,7 +88,7 @@ export function FileUpload({
       >
         {selectedFile ? (
           <div className="flex flex-col items-center text-center w-full">
-            <File className="h-8 w-8 text-primary mb-2" />
+            <FileIcon className="h-8 w-8 text-primary mb-2" />
             <p className="text-sm font-semibold text-foreground truncate w-full" title={selectedFile.name}>
               {selectedFile.name}
             </p>

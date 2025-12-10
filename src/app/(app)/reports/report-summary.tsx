@@ -56,19 +56,8 @@ const activityLabels = {
     tish: 'TISH',
     cornerToCorner: 'Corner to Corner',
     supportGroups: 'Support Group',
-    documentUploads: 'Document Upload',
     healthSpecialProjects: 'Health Special Project',
 };
-
-const topicLabels = {
-    "physical-activity": "Importance of Physical Activity",
-    "salt-reduction": "Salt reduction",
-    "nutrition": "Nutrition",
-    "obesity-overweight": "Obesity & Overweight",
-    "substance-abuse": "Tobacco, Alcohol & Substance Abuse",
-    "sexual-behaviour": "Safe Sexual Behaviour",
-    "other": "Other",
-  };
 
 const escapeCsvCell = (cellData: any) => {
     if (cellData === null || cellData === undefined) {
@@ -85,12 +74,20 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
   const { summary, breakdown, config, activities, users } = data;
     
   const handleDownload = () => {
-    const activityTypesToDownload = (selectedActivitiesForDownload.length > 0 
-        ? selectedActivitiesForDownload 
-        : Object.keys(breakdown)
-    ).map(key => activityLabels[key]);
+    // Determine which activity keys to use for filtering.
+    // If specific activities are selected, use those.
+    // Otherwise, use all activity keys that have data (> 0).
+    const activityKeysToDownload = selectedActivitiesForDownload.length > 0
+      ? selectedActivitiesForDownload
+      : Object.keys(breakdown).filter(key => breakdown[key] > 0);
+
+    // Map the keys (e.g., "weeklyPlans") to their proper labels (e.g., "Weekly Plan").
+    const activityTypesToDownload = activityKeysToDownload.map(key => activityLabels[key]);
     
-    const detailedActivities = activities.filter(activity => activityTypesToDownload.includes(activity.type));
+    // Filter the raw activities array to include only those whose type is in the download list.
+    const detailedActivities = activities.filter(activity => 
+      activityTypesToDownload.includes(activity.type)
+    );
 
     const headers = [
         "Activity ID", "Activity Type", "User Name", "District", "Date", "Start Time", "End Time",
@@ -112,12 +109,8 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
         "Support Group Type", "Other Support Group Type", "Physical Activity", "Other Physical Activity",
         // TISH / Corner to Corner specific
         "Services",
-        // Document Upload specific
-        "Document Title",
         // Health Special Project specific
         "Project Name", "Project Description",
-        // Attachments
-        "Register Attachment URL", "Picture Attachment URL",
     ];
 
     const rows = detailedActivities.map(activity => {
@@ -125,14 +118,32 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
         const details = activity.details || {};
 
         let topicDisplay = details.topic;
-        if (Array.isArray(details.topic)) {
+        if (Array.isArray(details.topic) && typeof details.topic[0] === 'string') {
           topicDisplay = details.topic.map(t => (t === 'Other' || t ==='other') && details.otherTopic ? details.otherTopic : t).join(', ');
         } else if (details.topic === 'Other' || details.topic === 'other') {
           topicDisplay = details.otherTopic;
-        } else if (activity.type === 'Health Talk' && details.topics) {
-            topicDisplay = details.topics.map(t => t === 'other' ? details.otherTopic : (topicLabels[t] || t)).join(', ');
         }
 
+        let healthTalkTopics = "";
+        if (activity.type === 'Health Talk' && details.topics && Array.isArray(details.topics)) {
+            healthTalkTopics = details.topics.map(t => {
+                if (t.id === 'other') {
+                    return `${details.otherTopic || 'Other'} (${t.peopleReached || 0})`;
+                }
+                return `${t.label} (${t.peopleReached || 0})`;
+            }).join('; ');
+        }
+
+        let schoolVisitTopics = "";
+        if (activity.type === 'School Visit' && details.topics && Array.isArray(details.topics)) {
+            schoolVisitTopics = details.topics.map(t => {
+                if (t.id === 'other') {
+                    return `${details.otherTopic || 'Other'} (${t.studentsReached || 0})`;
+                }
+                return `${t.label} (${t.studentsReached || 0})`;
+            }).join('; ');
+        }
+        
         let servicesDisplay = "";
         if (details.services && Array.isArray(details.services)) {
             servicesDisplay = details.services.map(s => {
@@ -168,7 +179,7 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
             "Venue": details.venue,
             "Location": details.location,
             "People Reached": details.peopleReached || details.studentsReached || details.childrenReached,
-            "Topic": topicDisplay,
+            "Topic": activity.type === 'Health Talk' ? healthTalkTopics : activity.type === 'School Visit' ? schoolVisitTopics : topicDisplay,
             "Other Topic": details.otherTopic,
             "Notes": details.notes,
             "NB": details.nb,
@@ -196,18 +207,15 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
             "Physical Activity": details.physicalActivity === 'Other' ? details.otherPhysicalActivity : details.physicalActivity,
             "Other Physical Activity": details.otherPhysicalActivity,
             "Services": servicesDisplay,
-            "Document Title": details.title,
             "Project Name": details.projectName,
             "Project Description": details.description,
-            "Register Attachment URL": details.registerAttachment,
-            "Picture Attachment URL": details.pictureAttachment,
         };
         return headers.map(header => escapeCsvCell(rowData[header])).join(',');
     });
 
     const csvContent = [headers.join(','), ...rows].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

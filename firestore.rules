@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -29,7 +30,7 @@ service cloud.firestore {
     // ----------------------------
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdministrator() || isSuperAdmin();
-      allow list: if isAdministrator() || isSuperAdmin();
+      allow list: if request.auth != null;
       // Allow user creation via client, but only with specific, validated fields
       allow create: if request.auth != null &&
                       request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'district', 'persalNumber', 'organization', 'phone']) &&
@@ -58,10 +59,8 @@ service cloud.firestore {
                       (isAdministrator() && resource.data.district == userDistrict()) ||
                       isActivityOwner(resource.data);
                       
-      // DELETE: Owners, Admins, and Super Admins can delete.
-      allow delete: if isSuperAdmin() ||
-                      (isAdministrator() && resource.data.district == userDistrict()) ||
-                      isActivityOwner(resource.data);
+      // DELETE: Owners or admins can delete.
+      allow delete: if isSuperAdmin() || isAdministrator() || isActivityOwner(resource.data);
     }
     
     // --- Data Validation Functions ---
@@ -77,7 +76,6 @@ service cloud.firestore {
            : data.type == 'Support Group' ? isValidSupportGroup(data)
            : data.type == 'Corner to Corner' ? isValidCornerToCorner(data)
            : data.type == 'TISH' ? isValidTish(data)
-           : data.type == 'Document Upload' ? isValidDocumentUpload(data)
            : data.type == 'Health Special Project' ? isValidHealthSpecialProject(data)
            : false;
     }
@@ -94,13 +92,15 @@ service cloud.firestore {
     function isValidHealthTalk(data) {
         return hasBaseActivityFields(data) &&
                data.details.keys().hasAll(['venue', 'topics', 'startTime', 'endTime', 'peopleReached', 'date']) &&
-               (data.details.topics.hasAny(['other']) == false || data.details.keys().hasAll(['otherTopic']));
+               (data.details.topics.all(t => t.keys().hasAll(['id', 'label', 'peopleReached']))) &&
+               (!data.details.topics.exists(t, t.id == 'other') || data.details.keys().hasAll(['otherTopic']));
     }
 
     function isValidSchoolVisit(data) {
         return hasBaseActivityFields(data) &&
-               data.details.keys().hasAll(['schoolName', 'gradeLevel', 'topic', 'studentsReached', 'startTime', 'endTime', 'date']) &&
-               (data.details.topic.hasAny(['Other']) == false || data.details.keys().hasAll(['otherTopic']));
+               data.details.keys().hasAll(['schoolName', 'gradeLevel', 'topics', 'studentsReached', 'startTime', 'endTime', 'date']) &&
+               (data.details.topics.all(t => t.keys().hasAll(['id', 'label', 'studentsReached']))) &&
+               (!data.details.topics.exists(t, t.id == 'other') || data.details.keys().hasAll(['otherTopic']));
     }
     
     function isValidCrecheVisit(data) {
@@ -157,11 +157,6 @@ service cloud.firestore {
                data.details.keys().hasAll(['venue', 'services', 'startTime', 'endTime', 'peopleReached', 'date']) &&
                (data.details.services.all(s => s.keys().hasAll(['id', 'label', 'peopleReached']))) &&
                (!data.details.services.exists(s, s.id == 'other') || data.details.keys().hasAll(['otherTopic']));
-    }
-    
-    function isValidDocumentUpload(data) {
-        return hasBaseActivityFields(data) &&
-               data.details.keys().hasAll(['title', 'registerAttachment', 'pictureAttachment', 'notes']);
     }
 
     function isValidHealthSpecialProject(data) {

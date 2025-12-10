@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -61,8 +60,8 @@ const districts = [
     "Sub-district 1B",
     "Sub-district 2",
     "Sub-district 3 & 4",
-    "Sub-district 5 & 7",
-    "Sub-district 6",
+    "Sub-district 5 & 6",
+    "Sub-district 7",
 ];
 
 export function ProfileTab() {

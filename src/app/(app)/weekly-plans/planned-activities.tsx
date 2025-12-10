@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { MapPin, Trash2, Loader2, Clock, User, Building, NotebookPen } from 'lucide-react';
 import {
   Card,
@@ -49,18 +49,28 @@ export function PlannedActivities() {
         });
     };
 
-  const sortedActivities = activities
-    .filter(a => a.type === 'Weekly Plan')
-    .map(activity => {
-        const user = users.find(u => u.id === activity.userId);
-        return { ...activity, userName: user?.displayName, userDistrict: user?.district };
-    })
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedActivities = React.useMemo(() => {
+        const now = new Date();
+        const monthStart = startOfMonth(now);
+        const monthEnd = endOfMonth(now);
+
+        return activities
+            .filter(a => {
+                if (a.type !== 'Weekly Plan') return false;
+                const activityDate = new Date(a.date);
+                return activityDate >= monthStart && activityDate <= monthEnd;
+            })
+            .map(activity => {
+                const user = users.find(u => u.id === activity.userId);
+                return { ...activity, userName: user?.displayName, userDistrict: user?.district };
+            })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }, [activities, users]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Planned Activities</CardTitle>
+        <CardTitle>This Month's Planned Activities</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -70,7 +80,9 @@ export function PlannedActivities() {
         ) : sortedActivities.length > 0 ? (
           <ScrollArea className="h-[480px]">
             <div className="space-y-4 pr-6">
-              {sortedActivities.map((item, index) => (
+              {sortedActivities.map((item, index) => {
+                const canDelete = isAdministrator || item.userId === currentUser?.uid;
+                return (
                 <React.Fragment key={item.id}>
                   <div className="flex items-start justify-between gap-4 rounded-lg p-4 hover:bg-secondary">
                     <div className="grid gap-1 flex-1">
@@ -110,6 +122,7 @@ export function PlannedActivities() {
                         <p className="text-right text-sm text-muted-foreground whitespace-nowrap">
                             {format(new Date(item.date), 'P')}
                         </p>
+                        {canDelete && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
@@ -131,16 +144,17 @@ export function PlannedActivities() {
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
+                        )}
                     </div>
                   </div>
                   {index < sortedActivities.length - 1 && <Separator />}
                 </React.Fragment>
-              ))}
+              )})}
             </div>
           </ScrollArea>
         ) : (
           <div className="flex h-[200px] items-center justify-center rounded-md border border-dashed">
-            <p className="text-muted-foreground">No activities planned yet.</p>
+            <p className="text-muted-foreground">No activities planned for this month.</p>
           </div>
         )}
       </CardContent>

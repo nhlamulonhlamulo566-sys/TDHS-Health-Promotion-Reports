@@ -2,6 +2,7 @@
 import { PageHeader } from "@/components/page-header";
 import { ImciTrainingForm } from "./imci-training-form";
 import { TrainingRecords } from "./training-records";
+import { Separator } from "@/components/ui/separator";
 
 export default function ImciTrainingPage() {
   return (
@@ -10,14 +11,9 @@ export default function ImciTrainingPage() {
         title="IMCI Training Reports"
         description="Integrated Management of Childhood Illness training documentation"
       />
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-            <ImciTrainingForm />
-        </div>
-        <div className="lg:col-span-1">
-            <TrainingRecords />
-        </div>
-      </div>
+      <ImciTrainingForm />
+      <Separator />
+      <TrainingRecords />
     </div>
   );
 }

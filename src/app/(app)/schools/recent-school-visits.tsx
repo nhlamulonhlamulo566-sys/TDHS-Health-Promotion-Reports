@@ -21,6 +21,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser } from '@/firebase';
 import { useActivities } from '@/hooks/use-activities';
 import { useUsers } from '@/hooks/use-users';
+import { startOfMonth, endOfMonth } from 'date-fns';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 const getGradeLevelDisplay = (grades: string[] | string) => {
     if (!grades) return "N/A";
@@ -31,13 +34,15 @@ const getGradeLevelDisplay = (grades: string[] | string) => {
 };
 
 const getTopicDisplay = (details: any) => {
-    const { topic, otherTopic } = details;
-    if (!topic) return 'No topics';
-    if (Array.isArray(topic)) {
-        const displayTopics = topic.map(t => (t === 'Other' && otherTopic ? otherTopic : t));
-        return displayTopics.join(', ');
-    }
-    return topic === 'Other' && otherTopic ? otherTopic : topic;
+    const { topics, otherTopic } = details;
+    if (!topics || topics.length === 0) return "No topics";
+    
+    return topics.map((t: any) => {
+        if (t.id === 'other') {
+            return `${otherTopic || 'Other'} (${t.studentsReached || 0})`;
+        }
+        return `${t.label} (${t.studentsReached || 0})`;
+    }).join(', ');
 }
 
 
@@ -50,6 +55,7 @@ export function RecentSchoolVisits() {
   const { user: currentUser } = useUser();
   const currentUserProfile = users.find(u => u.id === currentUser?.uid);
   const isAdministrator = currentUserProfile?.role === 'Administrator' || currentUserProfile?.role === 'Super Administrator';
+  
 
   const handleDelete = async (id: string) => {
     if (!firestore) return;
@@ -60,18 +66,28 @@ export function RecentSchoolVisits() {
     });
   };
 
-  const visits = activities
-    .filter(a => a.type === 'School Visit')
-    .map(activity => {
-        const user = users.find(u => u.id === activity.userId);
-        return { ...activity, userName: user?.displayName, userDistrict: user?.district };
-    })
-    .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const visits = React.useMemo(() => {
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+
+    return activities
+      .filter(a => {
+          if (a.type !== 'School Visit') return false;
+          const activityDate = new Date(a.date);
+          return activityDate >= monthStart && activityDate <= monthEnd;
+      })
+      .map(activity => {
+          const user = users.find(u => u.id === activity.userId);
+          return { ...activity, userName: user?.displayName, userDistrict: user?.district };
+      })
+      .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [activities, users]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent School Visits</CardTitle>
+        <CardTitle>This Month's School Visits</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -79,66 +95,75 @@ export function RecentSchoolVisits() {
                 <Loader2 className="animate-spin" />
             </div>
         ) : visits.length > 0 ? (
-          <div className="space-y-4">
-            {visits.map((visit) => (
-                <div key={visit.id} className="flex items-start justify-between gap-4 rounded-lg p-4 hover:bg-secondary">
-                    <div className="grid gap-1 flex-1">
-                      <p className="font-semibold">{getTopicDisplay(visit.details)}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span>{visit.details.schoolName}</span>
-                          <span className="text-xs text-muted-foreground">({getGradeLevelDisplay(visit.details.gradeLevel)})</span>
+          <ScrollArea className="h-[480px]">
+            <div className="space-y-4 pr-6">
+              {visits.map((visit, index) => {
+                const canDelete = isAdministrator || visit.userId === currentUser?.uid;
+                return (
+                <React.Fragment key={visit.id}>
+                  <div className="flex items-start justify-between gap-4 rounded-lg p-4 hover:bg-secondary">
+                      <div className="grid gap-1 flex-1">
+                        <p className="font-semibold">{getTopicDisplay(visit.details)}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{visit.details.schoolName}</span>
+                            <span className="text-xs text-muted-foreground">({getGradeLevelDisplay(visit.details.gradeLevel)})</span>
+                        </div>
+                        {isAdministrator && (
+                              <>
+                                  {visit.userName && (
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                          <User className="size-3" />
+                                          <span>{visit.userName}</span>
+                                      </div>
+                                  )}
+                                  {visit.userDistrict && (
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                          <Building className="size-3" />
+                                          <span>{visit.userDistrict}</span>
+                                      </div>
+                                  )}
+                              </>
+                          )}
                       </div>
-                      {isAdministrator && (
-                            <>
-                                {visit.userName && (
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <User className="size-3" />
-                                        <span>{visit.userName}</span>
-                                    </div>
-                                )}
-                                {visit.userDistrict && (
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <Building className="size-3" />
-                                        <span>{visit.userDistrict}</span>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <p className="text-right text-sm text-muted-foreground whitespace-nowrap">
-                            {new Date(visit.date).toLocaleDateString()}
-                        </p>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete this school visit.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(visit.id)}>
-                                    Delete
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
-                </div>
-            ))}
+                      <div className="flex items-center gap-2">
+                          <p className="text-right text-sm text-muted-foreground whitespace-nowrap">
+                              {new Date(visit.date).toLocaleDateString()}
+                          </p>
+                          {canDelete && (
+                              <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                          This action cannot be undone. This will permanently delete this school visit.
+                                      </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDelete(visit.id)}>
+                                          Delete
+                                      </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                  </AlertDialogContent>
+                              </AlertDialog>
+                          )}
+                      </div>
+                  </div>
+                  {index < visits.length - 1 && <Separator />}
+                </React.Fragment>
+            )})}
           </div>
+          </ScrollArea>
         ) : (
           <div className="flex flex-col h-60 items-center justify-center rounded-md border border-dashed text-center">
             <School className="h-10 w-10 text-muted-foreground/50 mb-4" strokeWidth={1.5} />
             <p className="text-muted-foreground">
-              No school visits recorded yet
+              No school visits recorded this month.
             </p>
           </div>
         )}

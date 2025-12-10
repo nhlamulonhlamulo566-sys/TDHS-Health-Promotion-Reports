@@ -22,7 +22,6 @@ const activityTypes = {
     'TISH': 'tish',
     'Corner to Corner': 'cornerToCorner',
     'Support Group': 'supportGroups',
-    'Document Upload': 'documentUploads',
     'Health Special Project': 'healthSpecialProjects',
 };
 
@@ -75,7 +74,6 @@ export default function ReportsPage() {
         tish: 0,
         cornerToCorner: 0,
         supportGroups: 0,
-        documentUploads: 0,
         healthSpecialProjects: 0,
     };
     

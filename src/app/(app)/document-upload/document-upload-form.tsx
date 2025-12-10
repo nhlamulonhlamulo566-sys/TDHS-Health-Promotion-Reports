@@ -61,6 +61,7 @@ const defaultValues: Partial<DocumentUploadFormValues> = {
 export function DocumentUploadForm() {
   const { toast } = useToast();
   const addDocumentUpload = useStore((state) => state.addDocumentUpload);
+  const { isUploading, uploadProgress } = useStore((s) => ({ isUploading: s.isUploading, uploadProgress: s.uploadProgress }));
   const { firestore, app } = useFirebase();
   const { user } = useUser();
   const { users } = useUsers();
@@ -198,12 +199,26 @@ export function DocumentUploadForm() {
                             <FormLabel>Attendance Register</FormLabel>
                             <FormControl>
                                 <FileUpload
-                                    onFileSelect={(file) => field.onChange(file)}
+                                  onFileSelect={(file) => field.onChange(file)}
+                                  value={field.value}
                                     accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,image/*"
                                     title="Upload Register"
                                     subtitle="PDF, Docs, Excel, Images"
                                 />
                             </FormControl>
+                            {/* per-file progress */}
+                            {field.value && (field.value as File).name && (
+                              <div className="mt-2">
+                                <div className="text-xs text-muted-foreground">{(field.value as File).name}</div>
+                                <div className="w-full bg-muted h-2 rounded mt-1">
+                                  <div
+                                    className="h-2 rounded bg-primary"
+                                    style={{ width: `${uploadProgress?.[(field.value as File).name] ?? 0}%` }}
+                                  />
+                                </div>
+                                <div className="text-xs text-right mt-1">{uploadProgress?.[(field.value as File).name] ?? 0}%</div>
+                              </div>
+                            )}
                             <FormMessage />
                         </FormItem>
                     )}
@@ -216,13 +231,26 @@ export function DocumentUploadForm() {
                             <FormLabel>Photo</FormLabel>
                             <FormControl>
                                 <FileUpload
-                                    onFileSelect={(file) => field.onChange(file)}
+                                   onFileSelect={(file) => field.onChange(file)}
+                                   value={field.value}
                                     accept="image/*"
                                     icon="image"
                                     title="Upload Photo"
                                     subtitle="JPG, PNG, GIF"
                                 />
                             </FormControl>
+                            {field.value && (field.value as File).name && (
+                              <div className="mt-2">
+                                <div className="text-xs text-muted-foreground">{(field.value as File).name}</div>
+                                <div className="w-full bg-muted h-2 rounded mt-1">
+                                  <div
+                                    className="h-2 rounded bg-primary"
+                                    style={{ width: `${uploadProgress?.[(field.value as File).name] ?? 0}%` }}
+                                  />
+                                </div>
+                                <div className="text-xs text-right mt-1">{uploadProgress?.[(field.value as File).name] ?? 0}%</div>
+                              </div>
+                            )}
                             <FormMessage />
                         </FormItem>
                     )}
@@ -247,9 +275,9 @@ export function DocumentUploadForm() {
               )}
             />
 
-            <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {isSubmitting ? "Uploading..." : "Save Document"}
+            <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || isUploading}>
+              {(isSubmitting || isUploading) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {(isSubmitting || isUploading) ? "Uploading..." : "Save Document"}
             </Button>
           </form>
         </Form>

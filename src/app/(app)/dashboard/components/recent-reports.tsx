@@ -18,7 +18,13 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 
-export default function RecentReports({ recentActivities }) {
+interface RecentActivity {
+  id: string;
+  type: string;
+  date: string | number | Date;
+}
+
+export default function RecentReports({ recentActivities }: { recentActivities?: RecentActivity[] | null }) {
   const isLoading = !recentActivities;
 
   return (

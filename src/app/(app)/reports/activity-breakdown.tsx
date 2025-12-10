@@ -27,13 +27,13 @@ const activityLabels = {
     tish: 'TISH',
     cornerToCorner: 'Corner to Corner',
     supportGroups: 'Support Group',
-    documentUploads: 'Document Upload',
     healthSpecialProjects: 'Health Special Project',
 };
 
 export function ActivityBreakdown({ data, selectedActivities, onSelectionChange }: ActivityBreakdownProps) {
-  const total = Object.values(data).reduce((sum, value) => sum + value, 0);
-  const allActivities = Object.keys(data);
+  const allActivities = Object.keys(data).filter(key => data[key] > 0);
+  const total = allActivities.reduce((sum, key) => sum + data[key], 0);
+
   const isAllSelected = allActivities.length > 0 && selectedActivities.length === allActivities.length;
 
   const handleSelectAll = (checked: boolean) => {
@@ -47,6 +47,10 @@ export function ActivityBreakdown({ data, selectedActivities, onSelectionChange 
       onSelectionChange(selectedActivities.filter(key => key !== activityKey));
     }
   };
+  
+  if (allActivities.length === 0) {
+    return null; // Don't render the component if there's no data to show
+  }
 
   return (
     <div>
