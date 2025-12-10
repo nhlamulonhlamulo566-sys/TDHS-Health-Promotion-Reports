@@ -22,3 +22,6 @@ serviceAccountKey.json
 # Other
 .DS_Store
 *.pem
+
+.vercel
+.env*.local
