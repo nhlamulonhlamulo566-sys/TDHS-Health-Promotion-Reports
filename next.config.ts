@@ -44,7 +44,6 @@ const nextConfig: NextConfig = {
         "https://6000-firebase-studio-1760445737428.cluster-cbeiita7rbe7iuwhvjs5zww2i4.cloudworkstations.dev",
     ]
   },
-  turbopack: {},
 };
 
 export default withPWA(nextConfig);
