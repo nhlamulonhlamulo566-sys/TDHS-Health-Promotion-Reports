@@ -67,13 +67,13 @@ const crecheVisitFormSchema = z.object({
   otherTopic: z.string().optional(),
   childrenMindersReached: z.coerce
     .number()
-    .min(1, "Number of children minders must be a positive number."),
+    .optional(),
   parentsReached: z.coerce
     .number()
-    .min(1, "Number of parents must be a positive number."),
+    .optional(),
   childrenReached: z.coerce
     .number()
-    .min(1, "Number of children must be a positive number."),
+    .optional(),
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
@@ -422,7 +422,7 @@ export function CrecheVisitForm() {
               name="childrenMindersReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of Children Minders Reached *</FormLabel>
+                  <FormLabel>Number of Children Minders Reached</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -444,7 +444,7 @@ export function CrecheVisitForm() {
               name="parentsReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of Parents Reached *</FormLabel>
+                  <FormLabel>Number of Parents Reached</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -466,7 +466,7 @@ export function CrecheVisitForm() {
               name="childrenReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of Children Reached *</FormLabel>
+                  <FormLabel>Number of Children Reached</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
