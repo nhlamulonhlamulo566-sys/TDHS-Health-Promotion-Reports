@@ -81,16 +81,16 @@ function LayoutWithSidebar({ children, userProfile, onLogout }) {
     return (
         <>
             <Sidebar>
-            <SidebarHeader className="pb-4">
-                <div className="flex flex-col items-center gap-3 py-3">
+            <SidebarHeader className="pb-2">
+                <div className="flex flex-col items-center gap-2 py-2 px-2">
                 <Button variant="ghost" size="icon" className="md:hidden self-end" asChild>
                     <SidebarTrigger />
                 </Button>
-                <div className="w-full flex justify-center">
-                    <Icons.logo className="h-20 w-20" />
+                <div className="w-full flex justify-center px-1">
+                    <Icons.logo className="h-32 w-full object-contain" style={{ maxWidth: '180px' }} />
                 </div>
-                <div className="text-center">
-                    <h1 className="font-headline text-sm font-bold leading-tight text-foreground">TDHS Health Promotion Reports System</h1>
+                <div className="text-center px-1">
+                    <h1 className="font-headline text-xs font-bold leading-tight text-foreground">TDHS Health Promotion Reports System</h1>
                 </div>
                 </div>
             </SidebarHeader>
