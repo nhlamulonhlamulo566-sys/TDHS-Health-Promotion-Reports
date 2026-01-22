@@ -1,6 +1,6 @@
 
 'use client';
-import { Icons } from "@/components/icons";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,32 +48,94 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-            <div className="mb-4 flex justify-center">
-                <Icons.logo className="size-8 text-primary" />
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4">
+      <Card className="w-full max-w-md shadow-lg border-0">
+        <CardHeader className="text-center space-y-6 pb-6">
+          {/* Enhanced Logo Section */}
+          <div className="flex justify-center items-center">
+            <div className="relative w-full">
+              {/* Decorative background */}
+              <div className="absolute inset-0 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl" />
+              
+              {/* Logo Container */}
+              <div className="relative flex justify-center py-6 px-4">
+                <div className="group cursor-default transition-transform duration-300 hover:scale-105">
+                  <Image
+                    src="/icons/SA-Department-of-Health-Logo.jpg"
+                    alt="Department of Health Logo"
+                    width={280}
+                    height={180}
+                    priority
+                    className="h-auto w-full max-w-xs drop-shadow-md transition-shadow duration-300 group-hover:drop-shadow-lg"
+                  />
+                </div>
+              </div>
             </div>
-          <CardTitle className="text-2xl font-headline">Welcome Back!</CardTitle>
-          <CardDescription>Enter your credentials to access your account</CardDescription>
+          </div>
+
+          {/* Title Section */}
+          <div className="space-y-2">
+            <CardTitle className="text-3xl font-bold text-gray-900">Welcome Back!</CardTitle>
+            <CardDescription className="text-base text-gray-600">
+              Enter your credentials to access your account
+            </CardDescription>
+          </div>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
+            {/* Email Field */}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="name@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading}/>
+              <Label htmlFor="email" className="text-sm font-semibold text-gray-700">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="name@example.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                className="h-11 bg-white border-gray-200 focus:border-green-500 focus:ring-green-100"
+              />
             </div>
+
+            {/* Password Field */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-              </div>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
+              <Label htmlFor="password" className="text-sm font-semibold text-gray-700">
+                Password
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                className="h-11 bg-white border-gray-200 focus:border-green-500 focus:ring-green-100"
+              />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading || !auth}>
-              {isLoading ? 'Signing In...' : 'Sign In'}
+
+            {/* Sign In Button */}
+            <Button
+              type="submit"
+              className="w-full h-11 text-base font-semibold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-200 mt-6"
+              disabled={isLoading || !auth}
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                  Signing In...
+                </span>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm text-muted-foreground">
+
+          {/* Footer Message */}
+          <div className="mt-6 pt-6 border-t border-gray-100 text-center text-sm text-gray-600">
             If you don't have an account, please contact an administrator to create one for you.
           </div>
         </CardContent>
