@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   Baby,
   CalendarDays,
@@ -82,14 +83,23 @@ function LayoutWithSidebar({ children, userProfile, onLogout }) {
         <>
             <Sidebar>
             <SidebarHeader className="pb-2">
-                <div className="flex flex-col items-center gap-2 py-2 px-2">
+                <div className="flex flex-col items-center gap-2 py-3 px-1">
                 <Button variant="ghost" size="icon" className="md:hidden self-end" asChild>
                     <SidebarTrigger />
                 </Button>
-                <div className="w-full flex justify-center px-1">
-                    <Icons.logo className="h-32 w-full object-contain" style={{ maxWidth: '180px' }} />
+                <div className="w-full flex justify-center">
+                    <div className="relative w-full px-1" style={{ maxWidth: '200px' }}>
+                        <Image
+                            src="/icons/SA-Department-of-Health-Logo.jpg"
+                            alt="Department of Health Logo"
+                            width={200}
+                            height={120}
+                            priority
+                            className="w-full h-auto object-contain drop-shadow-sm"
+                        />
+                    </div>
                 </div>
-                <div className="text-center px-1">
+                <div className="text-center px-2">
                     <h1 className="font-headline text-xs font-bold leading-tight text-foreground">TDHS Health Promotion Reports System</h1>
                 </div>
                 </div>
