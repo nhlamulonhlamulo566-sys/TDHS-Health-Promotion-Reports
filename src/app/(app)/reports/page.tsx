@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { ReportConfigurationForm } from "./report-configuration-form";
 import { ReportSummary } from "./report-summary";
 import { ActivityBreakdown } from "./activity-breakdown";
+import { PrintableReport } from "./printable-report";
 import { Separator } from "@/components/ui/separator";
 import { useActivities } from "@/hooks/use-activities";
 import { useUsers } from "@/hooks/use-users";
@@ -27,11 +28,14 @@ const activityTypes = {
 
 
 export default function ReportsPage() {
-  const [reportData, setReportData] = useState(null);
+  const [reportData, setReportData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { activities } = useActivities();
   const { users } = useUsers();
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
+
+  // whether we're looking at interactive summary or printable layout
+  const [viewMode, setViewMode] = useState<'summary' | 'print'>('summary');
 
   const handleGenerateReport = async (config: any) => {
     setIsLoading(true);
@@ -105,6 +109,8 @@ export default function ReportsPage() {
       config,
       users,
     });
+    // when new data arrives, show printable layout by default
+    setViewMode('print');
     
     setIsLoading(false);
   };
@@ -121,9 +127,31 @@ export default function ReportsPage() {
         isLoading={isLoading} 
       />
 
-      {reportData && (
+      {reportData && viewMode === 'summary' && (
         <div className="space-y-8">
           <Separator />
+          <div className="flex justify-end">
+            <button
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded"
+              onClick={() => setViewMode('print')}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 17l4 4 4-4m0-5H8m0 0V3m8 9v6m-8-6v6"
+                />
+              </svg>
+              <span>View Printable Report</span>
+            </button>
+          </div>
           <ReportSummary data={reportData} selectedActivitiesForDownload={selectedActivities} />
           <ActivityBreakdown 
             data={(reportData as any).breakdown}
@@ -131,6 +159,10 @@ export default function ReportsPage() {
             onSelectionChange={setSelectedActivities}
           />
         </div>
+      )}
+
+      {reportData && viewMode === 'print' && (
+        <PrintableReport data={reportData} onClose={() => setViewMode('summary')} />
       )}
     </div>
   );
