@@ -1,6 +1,7 @@
 
 'use client';
 import Image from "next/image";
+import { getLogoPath, DEFAULT_LOGO_PATH } from '@/lib/logo';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -61,8 +62,8 @@ export default function LoginPage() {
               <div className="relative flex justify-center py-6 px-4">
                 <div className="group cursor-default transition-transform duration-300 hover:scale-105">
                   <Image
-                    src="/icons/SA-Department-of-Health-Logo.jpg"
-                    alt="Department of Health Logo"
+                    src={getLogoPath() || DEFAULT_LOGO_PATH}
+                    alt="Provincial Health Logo"
                     width={280}
                     height={180}
                     priority

@@ -39,11 +39,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  devIndicators: {
-    allowedDevOrigins: [
-        "https://6000-firebase-studio-1760445737428.cluster-cbeiita7rbe7iuwhvjs5zww2i4.cloudworkstations.dev",
-    ]
-  },
+  // devIndicators configuration removed to maintain compatibility with Next.js types
 };
 
 export default withPWA(nextConfig);

@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Icons } from '@/components/icons';
+import { getLogoPath, DEFAULT_LOGO_PATH } from '@/lib/logo';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUser, useFirestore } from '@/firebase';
@@ -60,6 +61,8 @@ const menuItems = [
   { href: '/imci-training', label: 'IMCI Training', icon: HeartPulse },
   { href: '/outbreak-response', label: 'Outbreak Response', icon: Siren },
   { href: '/support-groups', label: 'Support Groups', icon: Users },
+  { href: '/meetings', label: 'Meetings', icon: CalendarDays },
+  { href: '/radio-slots', label: 'Radio Slots', icon: Mic },
   { href: '/corner-to-corner', label: 'Corner to Corner', icon: Home },
   { href: '/tish', label: 'TISH', icon: Home },
   { href: '/health-special-project', label: 'Health Special Project', icon: HeartHandshake },
@@ -90,12 +93,12 @@ function LayoutWithSidebar({ children, userProfile, onLogout }) {
                 <div className="w-full flex justify-center">
                     <div className="relative w-full px-1" style={{ maxWidth: '200px' }}>
                         <Image
-                            src="/icons/SA-Department-of-Health-Logo.jpg"
-                            alt="Department of Health Logo"
-                            width={200}
-                            height={120}
-                            priority
-                            className="w-full h-auto object-contain drop-shadow-sm"
+                          src={getLogoPath() || DEFAULT_LOGO_PATH}
+                          alt="Provincial Health Logo"
+                          width={200}
+                          height={120}
+                          priority
+                          className="w-full h-auto object-contain drop-shadow-sm"
                         />
                     </div>
                 </div>

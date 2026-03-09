@@ -53,6 +53,8 @@ const activityLabels = {
     crecheVisits: 'Creche Visit',
     outbreakResponses: 'Outbreak Response',
     socialMobilizations: 'Social Mobilization',
+    meetings: 'Meeting',
+    radioSlots: 'Radio Slot',
     tish: 'TISH',
     cornerToCorner: 'Corner to Corner',
     supportGroups: 'Support Group',
@@ -105,6 +107,10 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
         "School Name", "Grade Level", "Students Reached",
         // Social Mob specific
         "Mobilization Method", "Other Mobilization Method",
+        // Meeting specific
+        "Meeting Purpose",
+        // Radio Slot specific
+        "Radio Station", "Listenership",
         // Support Group specific
         "Support Group Type", "Other Support Group Type", "Physical Activity", "Other Physical Activity",
         // TISH / Corner to Corner specific
@@ -209,6 +215,9 @@ export function ReportSummary({ data, selectedActivitiesForDownload }: ReportSum
             "Services": servicesDisplay,
             "Project Name": details.projectName,
             "Project Description": details.description,
+            "Meeting Purpose": details.purpose,
+            "Radio Station": details.radioName,
+            "Listenership": details.listenership,
         };
         return headers.map(header => escapeCsvCell(rowData[header])).join(',');
     });

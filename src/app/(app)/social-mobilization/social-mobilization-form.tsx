@@ -51,15 +51,8 @@ import { useUsers } from "@/hooks/use-users";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const topics = [
-    "Health Education",
-    "Vaccination Benefits",
-    "Nutrition Importance",
-    "Mental Health",
-    "Disease Prevention",
-    "Hygiene Practices",
-    "Exercise Benefits",
-    "Substance Abuse",
-    "Other",
+  "Health Education",
+  "Awareness",
 ];
 
 const campaignFormSchema = z.object({
@@ -76,6 +69,7 @@ const campaignFormSchema = z.object({
   }),
   otherMobilizationMethod: z.string().optional(),
   topic: z.string().min(1, "You have to select at least one topic."),
+  wardNumber: z.string().min(1, "Ward number is required."),
   otherTopic: z.string().optional(),
   peopleReached: z.coerce.number().min(1, "Please enter a valid number."),
   notes: z.string().optional(),
@@ -121,6 +115,7 @@ type CampaignFormValues = z.infer<typeof campaignFormSchema>;
 
 const defaultValues: Partial<CampaignFormValues> = {
   location: "",
+  wardNumber: "",
   campaignType: [],
   otherCampaignType: "",
   mobilizationMethod: [],
@@ -319,6 +314,19 @@ export function SocialMobilizationForm() {
                           {...field}
                         />
                       </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="wardNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ward Number *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter ward number..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -559,7 +567,7 @@ export function SocialMobilizationForm() {
               name="peopleReached"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of People Reached *</FormLabel>
+                  <FormLabel>Number of Streets Reached *</FormLabel>
                   <FormControl>
                     <div className="relative">
                         <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

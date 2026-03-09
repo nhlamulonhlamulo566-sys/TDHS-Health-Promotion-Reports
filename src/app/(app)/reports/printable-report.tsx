@@ -40,13 +40,17 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
     activities.forEach((act) => {
       if (act.type === "Health Talk") {
         const topicsArr = act.details.topics || [];
-        if (topicsArr.some((t: any) => t.id === topic.id)) {
-          facilityCount += act.details.peopleReached || 0;
+        // sum peopleReached for this specific topic from the health talk's topics array
+        const matching = topicsArr.find((t: any) => t.id === topic.id);
+        if (matching) {
+          facilityCount += Number(matching.peopleReached || 0);
         }
       } else if (act.type === "School Visit") {
         const topicsArr = act.details.topics || [];
-        if (topicsArr.some((t: any) => t.id === topic.id)) {
-          schoolCount += act.details.studentsReached || 0;
+        // sum studentsReached for this specific topic from the school visit's topics array
+        const matching = topicsArr.find((t: any) => t.id === topic.id);
+        if (matching) {
+          schoolCount += Number(matching.studentsReached || 0);
         }
       }
     });
@@ -78,48 +82,117 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
       .join(", ");
   };
 
-  // Section 2: Health Talk on other Topics (anything that is not one of the healthy topics or 'other')
+  // Section 2: Health Talk on other Topics (per-topic rows)
   const section2 = activities
-    .filter((act) => {
-      if (act.type !== "Health Talk") return false;
+    .filter((act) => act.type === "Health Talk")
+    .flatMap((act) => {
       const topicsArr = act.details.topics || [];
-      const ids = topicsArr.map((t: any) => t.id);
-      const hasHealthy = ids.some((id: string) => healthyTopicsList.map(t => t.id).includes(id));
-      const hasOther = ids.includes("other");
-      return hasOther || !hasHealthy;
-    })
-    .map((act) => ({
-      date: act.date,
-      venue: act.details.venue,
-      activity: formatTopics(act.details.topics, act.details.otherTopic),
-      people: act.details.peopleReached || 0,
-    }));
+      if (Array.isArray(topicsArr) && topicsArr.length > 0) {
+        return topicsArr
+          .filter((t: any) => {
+            const id = t.id;
+            const isHealthy = healthyTopicsList.map((h) => h.id).includes(id);
+            return id === "other" || !isHealthy;
+          })
+          .map((t: any) => ({
+            date: act.date,
+            venue: act.details.venue,
+            activity: t.id === "other" ? act.details.otherTopic || "Other" : t.label || t.id,
+            people: Number(t.peopleReached || 0),
+          }));
+      }
+      // fallback: if no topics array, include the activity-level entry
+      return [
+        {
+          date: act.date,
+          venue: act.details.venue,
+          activity: act.details.otherTopic || act.details.topic || "Other",
+          people: act.details.peopleReached || 0,
+        },
+      ];
+    });
 
   // Section 3 & 4: School visits split by topic membership
   const schoolVisits = activities.filter((a) => a.type === "School Visit");
-  const section3 = schoolVisits.filter((sv) => {
-    const ids = (sv.details.topics || []).map((t: any) => t.id);
-    return ids.every((id: string) =>
-      healthyTopicsList.map((t) => t.id).includes(id)
-    );
+  // Section 3: Schools (healthy topics) - expand to per-topic rows
+  const section3 = schoolVisits.flatMap((sv) => {
+    const topics = sv.details.topics || [];
+    if (Array.isArray(topics) && topics.length > 0) {
+      return topics
+        .filter((t: any) => healthyTopicsList.map((h) => h.id).includes(t.id))
+        .map((t: any) => ({
+          date: sv.date,
+          schoolName: sv.details.schoolName,
+          gradeLevel: sv.details.gradeLevel,
+          topic: t.id === "other" ? sv.details.otherTopic || "Other" : t.label || t.id,
+          studentsReached: Number(t.studentsReached || 0),
+        }));
+    }
+    // fallback include whole activity
+    return [
+      {
+        date: sv.date,
+        schoolName: sv.details.schoolName,
+        gradeLevel: sv.details.gradeLevel,
+        topic: sv.details.otherTopic || sv.details.topic || "Other",
+        studentsReached: sv.details.studentsReached || 0,
+      },
+    ];
   });
-  const section4 = schoolVisits.filter((sv) => {
-    const ids = (sv.details.topics || []).map((t: any) => t.id);
-    // include those that have at least one non-healthy or "other"
-    return ids.some(
-      (id: string) =>
-        !healthyTopicsList.map((t) => t.id).includes(id) || id === "other"
-    );
+
+  // Section 4: Schools Other Topics - expand to per-topic rows for non-healthy or other
+  const section4 = schoolVisits.flatMap((sv) => {
+    const topics = sv.details.topics || [];
+    if (Array.isArray(topics) && topics.length > 0) {
+      return topics
+        .filter((t: any) => !healthyTopicsList.map((h) => h.id).includes(t.id) || t.id === "other")
+        .map((t: any) => ({
+          date: sv.date,
+          schoolName: sv.details.schoolName,
+          gradeLevel: sv.details.gradeLevel,
+          topic: t.id === "other" ? sv.details.otherTopic || "Other" : t.label || t.id,
+          studentsReached: Number(t.studentsReached || 0),
+        }));
+    }
+    // fallback include whole activity
+    return [
+      {
+        date: sv.date,
+        schoolName: sv.details.schoolName,
+        gradeLevel: sv.details.gradeLevel,
+        topic: sv.details.otherTopic || sv.details.topic || "Other",
+        studentsReached: sv.details.studentsReached || 0,
+      },
+    ];
   });
+
+  
+
+  // Helper: expand activities by their topics into per-topic rows when available.
+  const buildPerTopicList = (type: string) => {
+    return activities
+      .filter((a) => a.type === type)
+      .flatMap((act) => {
+        const topics = act.details.topics || [];
+        if (Array.isArray(topics) && topics.length > 0) {
+          return topics.map((t: any) => ({
+            Date: act.date,
+            ...act.details,
+            topic: t.id === "other" ? act.details.otherTopic || "Other" : t.label || t.id,
+            peopleReached: t.peopleReached != null ? Number(t.peopleReached) : act.details.peopleReached,
+            studentsReached: t.studentsReached != null ? Number(t.studentsReached) : act.details.studentsReached,
+          }));
+        }
+        return [{ Date: act.date, ...act.details }];
+      });
+  };
 
   // Section 5 & 6: Creche visits normal vs other
   const crecheVisits = activities.filter((a) => a.type === "Creche Visit");
-  const section5 = crecheVisits.filter(
-    (cv) => !cv.details.topic || !cv.details.topic.includes("Other")
-  );
-  const section6 = crecheVisits.filter(
-    (cv) => cv.details.topic && cv.details.topic.includes("Other")
-  );
+  // Expand creche visits by topics when available, then split into normal vs other
+  const perCreche = buildPerTopicList("Creche Visit");
+  const section5 = perCreche.filter((cv) => String(cv.topic || "").toLowerCase() !== "other");
+  const section6 = perCreche.filter((cv) => String(cv.topic || "").toLowerCase() === "other");
 
   // Helper to build generic listing for other activity types
   const buildList = (type: string) => {
@@ -128,17 +201,42 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
       .map((a) => ({ ...a.details, Date: a.date }));
   };
 
-  const section7 = buildList("Health Campaign");
-  const section8 = buildList("Social Mobilization");
-  const section9 = buildList("IMCI Training");
-  const section10 = buildList("Outbreak Response");
-  const section11 = buildList("Support Group");
-  const section12 = buildList("Corner to Corner");
-  const section13 = buildList("TISH");
-  const section14 = buildList("Health Special Project");
+  // Use per-topic expanded rows for most activity types (other than Health Talk and School Visit)
+  const section7 = buildPerTopicList("Health Campaign");
+  const section8 = buildPerTopicList("Social Mobilization");
+  const section9 = buildPerTopicList("IMCI Training");
+  const section10 = buildPerTopicList("Outbreak Response");
+  const section11 = buildPerTopicList("Support Group");
+  const section12 = buildPerTopicList("Corner to Corner");
+  const section13 = buildPerTopicList("TISH");
+  const section14 = buildPerTopicList("Health Special Project");
 
   // cell formatting helper
-  const formatValue = (key: string, raw: any) => {
+  const formatValue = (key: string, raw: any, row?: any) => {
+    // Special handling for people counts: prefer topic-level counts when present
+    if (key === "peopleReached") {
+      if (raw != null) return raw;
+      if (row) {
+        // If this row lists services with individual counts, sum them for the peopleReached cell
+        if (Array.isArray(row.services) && row.services.length > 0) {
+          return row.services.reduce((acc: number, s: any) => acc + Number(s.peopleReached ?? s.count ?? s.number ?? 0), 0);
+        }
+        // Health Talk topics -> sum peopleReached
+        if (Array.isArray(row.topics) && row.topics.some((t: any) => t.peopleReached != null)) {
+          return row.topics.reduce((acc: number, t: any) => acc + Number(t.peopleReached || 0), 0);
+        }
+        // School visits topics -> sum studentsReached
+        if (Array.isArray(row.topics) && row.topics.some((t: any) => t.studentsReached != null)) {
+          return row.topics.reduce((acc: number, t: any) => acc + Number(t.studentsReached || 0), 0);
+        }
+        if (row.studentsReached != null) return row.studentsReached;
+        if (row.childrenReached != null) return row.childrenReached;
+        if (row.listenership != null) return row.listenership;
+      }
+      return raw;
+    }
+    
+    
     if (key === "services" && Array.isArray(raw)) {
       return raw
         .map((s: any) => {
@@ -158,6 +256,12 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
             }
             return JSON.stringify(item);
           }
+          // if the array contains the literal 'Other', prefer the matching other... field from the row when available
+          if (typeof item === 'string' && item.toLowerCase() === 'other' && row) {
+            return (
+              row.otherTopic || row.otherCampaignType || row.otherMobilizationMethod || row.otherSupportGroupType || row.otherPhysicalActivity || item
+            );
+          }
           return String(item);
         })
         .join(", ");
@@ -166,7 +270,19 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
       if (raw.label) return raw.label;
       return JSON.stringify(raw);
     }
+    // If this is a simple topic field and is 'Other', prefer to show the specified otherTopic
+    if (key === "topic" && typeof raw === "string") {
+      if ((raw.toLowerCase && raw.toLowerCase() === "other") && row && row.otherTopic) return row.otherTopic;
+      return raw;
+    }
     return raw;
+  };
+
+  const formatDateSafe = (d: any) => {
+    const val = d || d === 0 ? d : undefined;
+    const parsed = val ? new Date(val) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) return "";
+    return format(parsed, "yyyy-MM-dd");
   };
 
   return (
@@ -264,10 +380,10 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
           {section3.map((sv, idx) => (
             <tr key={idx}>
               <td className="border px-2 py-1">{format(new Date(sv.date), "yyyy-MM-dd")}</td>
-              <td className="border px-2 py-1">{sv.details.schoolName}</td>
-              <td className="border px-2 py-1">{Array.isArray(sv.details.gradeLevel) ? sv.details.gradeLevel.join(", ") : sv.details.gradeLevel}</td>
-              <td className="border px-2 py-1">{formatTopics(sv.details.topics, sv.details.otherTopic)}</td>
-              <td className="border px-2 py-1 text-center">{sv.details.studentsReached}</td>
+              <td className="border px-2 py-1">{sv.schoolName}</td>
+              <td className="border px-2 py-1">{Array.isArray(sv.gradeLevel) ? sv.gradeLevel.join(", ") : sv.gradeLevel}</td>
+                      <td className="border px-2 py-1">{sv.topic}</td>
+                      <td className="border px-2 py-1 text-center">{sv.studentsReached}</td>
             </tr>
           ))}
         </tbody>
@@ -289,10 +405,10 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
           {section4.map((sv, idx) => (
             <tr key={idx}>
               <td className="border px-2 py-1">{format(new Date(sv.date), "yyyy-MM-dd")}</td>
-              <td className="border px-2 py-1">{sv.details.schoolName}</td>
-              <td className="border px-2 py-1">{Array.isArray(sv.details.gradeLevel) ? sv.details.gradeLevel.join(", ") : sv.details.gradeLevel}</td>
-              <td className="border px-2 py-1">{formatTopics(sv.details.topics, sv.details.otherTopic)}</td>
-              <td className="border px-2 py-1 text-center">{sv.details.studentsReached}</td>
+              <td className="border px-2 py-1">{sv.schoolName}</td>
+              <td className="border px-2 py-1">{Array.isArray(sv.gradeLevel) ? sv.gradeLevel.join(", ") : sv.gradeLevel}</td>
+              <td className="border px-2 py-1">{sv.topic}</td>
+              <td className="border px-2 py-1 text-center">{sv.studentsReached}</td>
             </tr>
           ))}
         </tbody>
@@ -315,13 +431,13 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
         <tbody>
           {section5.map((cv, idx) => (
             <tr key={idx}>
-              <td className="border px-2 py-1">{format(new Date(cv.date), "yyyy-MM-dd")}</td>
-              <td className="border px-2 py-1">{cv.details.crecheName}</td>
-              <td className="border px-2 py-1">{cv.details.ageGroup}</td>
-              <td className="border px-2 py-1">{(cv.details.topic || []).join(", ")} {cv.details.otherTopic ? `(${cv.details.otherTopic})` : ""}</td>
-              <td className="border px-2 py-1 text-center">{cv.details.childrenMindersReached}</td>
-              <td className="border px-2 py-1 text-center">{cv.details.parentsReached}</td>
-              <td className="border px-2 py-1 text-center">{cv.details.childrenReached}</td>
+              <td className="border px-2 py-1">{formatDateSafe(cv.Date ?? cv.date)}</td>
+              <td className="border px-2 py-1">{cv.crecheName}</td>
+              <td className="border px-2 py-1">{cv.ageGroup}</td>
+              <td className="border px-2 py-1">{String(cv.topic || cv.topics || "")}{cv.otherTopic ? ` (${cv.otherTopic})` : ""}</td>
+              <td className="border px-2 py-1 text-center">{cv.childrenMindersReached ?? cv.childrenMindersReached === 0 ? cv.childrenMindersReached : cv.peopleReached}</td>
+              <td className="border px-2 py-1 text-center">{cv.parentsReached ?? cv.parentsReached === 0 ? cv.parentsReached : cv.peopleReached}</td>
+              <td className="border px-2 py-1 text-center">{cv.childrenReached ?? cv.childrenReached === 0 ? cv.childrenReached : cv.studentsReached ?? cv.peopleReached}</td>
             </tr>
           ))}
         </tbody>
@@ -344,13 +460,13 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
         <tbody>
           {section6.map((cv, idx) => (
             <tr key={idx}>
-              <td className="border px-2 py-1">{format(new Date(cv.date), "yyyy-MM-dd")}</td>
-              <td className="border px-2 py-1">{cv.details.crecheName}</td>
-              <td className="border px-2 py-1">{cv.details.ageGroup}</td>
-              <td className="border px-2 py-1">{(cv.details.topic || []).join(", ")} {cv.details.otherTopic ? `(${cv.details.otherTopic})` : ""}</td>
-              <td className="border px-2 py-1 text-center">{cv.details.childrenMindersReached}</td>
-              <td className="border px-2 py-1 text-center">{cv.details.parentsReached}</td>
-              <td className="border px-2 py-1 text-center">{cv.details.childrenReached}</td>
+              <td className="border px-2 py-1">{formatDateSafe(cv.Date ?? cv.date)}</td>
+              <td className="border px-2 py-1">{cv.crecheName}</td>
+              <td className="border px-2 py-1">{cv.ageGroup}</td>
+              <td className="border px-2 py-1">{String(cv.topic || cv.topics || "")}{cv.otherTopic ? ` (${cv.otherTopic})` : ""}</td>
+              <td className="border px-2 py-1 text-center">{cv.childrenMindersReached ?? cv.childrenMindersReached === 0 ? cv.childrenMindersReached : cv.peopleReached}</td>
+              <td className="border px-2 py-1 text-center">{cv.parentsReached ?? cv.parentsReached === 0 ? cv.parentsReached : cv.peopleReached}</td>
+              <td className="border px-2 py-1 text-center">{cv.childrenReached ?? cv.childrenReached === 0 ? cv.childrenReached : cv.studentsReached ?? cv.peopleReached}</td>
             </tr>
           ))}
         </tbody>
@@ -370,6 +486,30 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
           ],
         },
         {
+          title: "8. Meetings",
+          data: buildList("Meeting"),
+          columns: [
+            { key: "Date", label: "Date" },
+            { key: "venue", label: "Venue" },
+            { key: "topic", label: "Topic/Agenda" },
+            { key: "startTime", label: "Start Time" },
+            { key: "endTime", label: "End Time" },
+            { key: "peopleReached", label: "Number of people reached" },
+          ],
+        },
+        {
+          title: "9. Radio Slots",
+          data: buildList("Radio Slot"),
+          columns: [
+            { key: "Date", label: "Date" },
+            { key: "Radio Station", label: "Radio Station" },
+            { key: "topic", label: "Topic covered" },
+            { key: "Listenership", label: "Listenership" },
+            { key: "startTime", label: "Start Time" },
+            { key: "endTime", label: "End Time" },
+          ],
+        },
+        {
           title: "8. Social Mobilization",
           data: section8,
           columns: [
@@ -377,7 +517,8 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
             { key: "campaignType", label: "Campaign Type" },
             { key: "mobilizationMethod", label: "Mobilization type" },
             { key: "topic", label: "Topic covered" },
-            { key: "peopleReached", label: "Number of people reached" },
+            { key: "wardNumber", label: "Ward Number" },
+            { key: "peopleReached", label: "Number of Streets Reached" },
           ],
         },
         {
@@ -419,6 +560,8 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
             { key: "Date", label: "Date" },
             { key: "venue", label: "Venue" },
             { key: "services", label: "Services rendered" },
+            { key: "healthTalkTopic", label: "Health talk topic" },
+            { key: "healthTalkAttendees", label: "No. attended" },
             { key: "peopleReached", label: "No reached" },
           ],
         },
@@ -429,6 +572,8 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
             { key: "Date", label: "Date" },
             { key: "venue", label: "Venue" },
             { key: "services", label: "Services rendered" },
+            { key: "healthTalkTopic", label: "Health talk topic" },
+            { key: "healthTalkAttendees", label: "No. attended" },
             { key: "peopleReached", label: "No. Reached" },
           ],
         },
@@ -464,7 +609,7 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
                     if (col.key === "Date") {
                       display = format(new Date(row.Date), "yyyy-MM-dd");
                     } else {
-                      display = formatValue(col.key, raw);
+                      display = formatValue(col.key, raw, row);
                     }
                     return (
                       <td key={col.key} className="border px-2 py-1">

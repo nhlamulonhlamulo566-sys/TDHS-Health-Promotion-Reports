@@ -69,31 +69,26 @@ export default function DashboardPage() {
     const topicsSummary: { [key: string]: number } = monthlyHealthTalks.reduce((acc, talk) => {
         if (talk.details && Array.isArray(talk.details.topics)) {
             talk.details.topics.forEach((topic: { id: string; label: string; peopleReached: number }) => {
+                // Exclude 'other' from dashboard topic counts
+                if (topic.id === 'other') return;
                 const reached = topic.peopleReached || 0;
-
-                if (topic.id === 'other') {
-                    if (!acc['Other']) {
-                        acc['Other'] = 0;
-                    }
-                    acc['Other'] += reached;
-                } else {
-                    const topicLabel = topic.label;
-                    if (!acc[topicLabel]) {
-                        acc[topicLabel] = 0;
-                    }
-                    acc[topicLabel] += reached;
+                const topicLabel = topic.label;
+                if (!acc[topicLabel]) {
+                    acc[topicLabel] = 0;
                 }
+                acc[topicLabel] += reached;
             });
         }
         return acc;
     }, {} as { [key: string]: number });
 
-    const topicsData = Object.entries(topicsSummary)
-      .map(([topic, count]) => ({
-          topic: topicLabelMap[topic] || topic, // Use shortcut if available
-          count
-      }))
-      .sort((a, b) => b.count - a.count);
+        const topicsData = Object.entries(topicsSummary)
+            .map(([topic, count]) => ({
+                    topic: topicLabelMap[topic] || topic, // Use shortcut if available
+                    count
+            }))
+            .filter(t => (t.topic || '').toLowerCase() !== 'other')
+            .sort((a, b) => b.count - a.count);
 
     return { stats, chartData, topicsData };
   // eslint-disable-next-line react-hooks/exhaustive-deps

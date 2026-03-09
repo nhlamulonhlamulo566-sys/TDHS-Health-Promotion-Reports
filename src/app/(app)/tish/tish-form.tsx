@@ -72,6 +72,9 @@ const serviceSessionFormSchema = z.object({
     message: "You have to select at least one service.",
   }),
   otherTopic: z.string().optional(),
+  healthTalkDelivered: z.boolean().optional(),
+  healthTalkTopic: z.string().optional(),
+  healthTalkAttendees: z.coerce.number().optional(),
   notes: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
@@ -111,6 +114,9 @@ const defaultValues: Partial<ServiceSessionFormValues> = {
   venue: "",
   services: [],
   otherTopic: "",
+  healthTalkDelivered: false,
+  healthTalkTopic: "",
+  healthTalkAttendees: undefined,
   notes: "",
   startTime: "",
   endTime: "",
@@ -176,10 +182,15 @@ export function TishForm() {
     setIsSubmitting(true);
     try {
         const totalPeopleReached = data.services.reduce((acc, service) => acc + (service.peopleReached || 0), 0);
+        const details = { ...data, peopleReached: totalPeopleReached } as any;
+        if (!data.healthTalkDelivered) {
+          delete details.healthTalkTopic;
+          delete details.healthTalkAttendees;
+        }
         const activityData = {
           date: data.date.toISOString(),
           type: 'TISH',
-          details: { ...data, peopleReached: totalPeopleReached },
+          details,
         };
         await addActivity(app, firestore, user.uid, currentUserProfile.district, activityData);
 
@@ -321,6 +332,53 @@ export function TishForm() {
                   {duration || "N/A"}
                 </div>
               </FormItem>
+              <FormField
+                control={form.control}
+                name="healthTalkDelivered"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Health Talk Delivered?</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" checked={field.value || false} onChange={(e) => field.onChange(e.target.checked)} />
+                        <span className="text-sm text-muted-foreground">Check if a health talk was given during this session</span>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {form.watch('healthTalkDelivered') && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="healthTalkTopic"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Health Talk Topic</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter topic" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="healthTalkAttendees"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Number of attendees</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
             </div>
             
             <FormField

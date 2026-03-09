@@ -60,7 +60,7 @@ const defaultValues: Partial<DocumentUploadFormValues> = {
 
 export function DocumentUploadForm() {
   const { toast } = useToast();
-  const addDocumentUpload = useStore((state) => state.addDocumentUpload);
+  const addAttachment = useStore((state) => state.addAttachment);
   const { isUploading, uploadProgress } = useStore((s) => ({ isUploading: s.isUploading, uploadProgress: s.uploadProgress }));
   const { firestore, app } = useFirebase();
   const { user } = useUser();
@@ -96,7 +96,7 @@ export function DocumentUploadForm() {
         pictureFile: data.pictureFile,
       };
 
-      await addDocumentUpload(app, firestore, user.uid, currentUserProfile.district, attachmentData, uploadTasks);
+      await addAttachment(firestore, app, user.uid, currentUserProfile.district, attachmentData, uploadTasks);
       
       toast({
         title: "Document Saved!",

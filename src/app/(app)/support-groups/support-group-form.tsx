@@ -122,6 +122,7 @@ const groupTypes = [
   "Grief and Loss",
   "Caregivers",
   "Disability",
+  "Physical Activity",
   "Other",
 ];
 
