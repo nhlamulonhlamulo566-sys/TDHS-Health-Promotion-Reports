@@ -491,10 +491,10 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
           columns: [
             { key: "Date", label: "Date" },
             { key: "venue", label: "Venue" },
-            { key: "topic", label: "Topic/Agenda" },
+            { key: "purpose", label: "Purpose" },
             { key: "startTime", label: "Start Time" },
             { key: "endTime", label: "End Time" },
-            { key: "peopleReached", label: "Number of people reached" },
+            { key: "notes", label: "Notes" },
           ],
         },
         {
