@@ -502,9 +502,9 @@ export function PrintableReport({ data, onClose }: PrintableReportProps) {
           data: buildList("Radio Slot"),
           columns: [
             { key: "Date", label: "Date" },
-            { key: "Radio Station", label: "Radio Station" },
+            { key: "radioName", label: "Radio Station" },
             { key: "topic", label: "Topic covered" },
-            { key: "Listenership", label: "Listenership" },
+            { key: "listenership", label: "Listenership" },
             { key: "startTime", label: "Start Time" },
             { key: "endTime", label: "End Time" },
           ],
